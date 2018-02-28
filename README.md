@@ -1,7 +1,7 @@
 Restic-Cronned
 ==============
 This tool is a cron-like daemon that performs periodic commands using restic. (backup/forget/...)  
-Obviously depends on restic  
+Obviously depends on [restic](https://github.com/restic/restic)
 # Features #
 * multiple jobs
 * passwords from all keyrings that github.com/zalando/go-keyring supports
