@@ -12,7 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	keyring "github.com/zalando/go-keyring"
+)
+
+var (
+//log = log.New()
 )
 
 //Job represents one job that will be run in a Queue
@@ -70,7 +75,7 @@ const (
 func (job *Job) retrieveAndStorePassword() {
 	key, err := keyring.Get(job.Service, job.Username)
 	if err != nil {
-		println("Job: " + job.JobName + " couldn't retrieve password.")
+		log.WithFields(log.Fields{"Job": job.JobName}).Warning("couldn't retrieve password.")
 	}
 	job.password = key
 }
@@ -93,21 +98,20 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 		job.failedRetries = 0
 		result = job.run()
 		for result == returnRetry && (job.MaxFailedRetries < 0 || job.failedRetries < job.MaxFailedRetries) {
-			println("Job: " + job.JobName + " retry number: " + strconv.Itoa(job.failedRetries+1))
 			job.failedRetries++
 			time.Sleep(job.RetryTimer)
 			result = job.run()
 		}
 
 		if result != returnOk {
-			println("Stopping Job: " + job.JobName + " after " + strconv.Itoa(job.failedRetries) + " retries")
+			log.WithFields(log.Fields{"Job": job.JobName, "retries": strconv.Itoa(job.failedRetries)}).Warning("Stopping")
 			break //break loop for job, it did fail completely
 		}
 
 		endTime := time.Now().UnixNano()
 		used := endTime - startTime.UnixNano()
 
-		println("Job: " + job.JobName + " ran successfully at: " + startTime.Format(time.UnixDate) + " in: " + strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64) + " seconds")
+		log.WithFields(log.Fields{"Job": job.JobName, "Used": strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64)}).Warning("successful")
 
 		time.Sleep(job.RegularTimer - time.Duration(used))
 	}
@@ -127,7 +131,6 @@ func (job *Job) updateStatus(stdout io.ReadCloser) {
 		chunk = strings.Replace(chunk, "\000", " ", 1)
 		toks := strings.Split(chunk, " ")
 		for _, token := range toks {
-			println(token)
 			if strings.HasSuffix(token, "%") {
 				val, err := strconv.ParseFloat(token[:len(token)-1], 32)
 				if err == nil {
@@ -175,9 +178,7 @@ func (job *Job) run() JobReturn {
 			exitCode = 1
 		}
 
-		println("Job: " + job.JobName + " encountered an error: " + err.Error())
-		println("Message: " + stderr.String())
-
+		log.WithFields(log.Fields{"Job": job.JobName, "error": err.Error(), "message": stderr.String()}).Warning("error")
 	}
 
 	switch exitCode {

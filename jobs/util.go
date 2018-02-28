@@ -6,12 +6,14 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 func FindJobs(path string) []*Job {
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		println("error opening the directory: " + err.Error())
+		log.Fatal("Error opening the directory: " + err.Error())
 	}
 
 	jobs := make([]*Job, 0)
@@ -23,7 +25,7 @@ func FindJobs(path string) []*Job {
 
 		file, err := os.Open(f.Name())
 		if err != nil {
-			println("error opening the file " + f.Name() + " : " + err.Error())
+			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("File error")
 			continue
 		}
 
@@ -31,7 +33,7 @@ func FindJobs(path string) []*Job {
 		jsonParser := json.NewDecoder(file)
 		err = jsonParser.Decode(&job)
 		if err != nil {
-			println("error decoding the file " + f.Name() + " : " + err.Error())
+			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("Decodinf error")
 			continue
 		}
 		job.retrieveAndStorePassword()
