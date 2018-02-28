@@ -1,0 +1,9 @@
+{
+    "regularTimer": 86400,
+    "retryTimer": 3600,
+    "maxFailedRetries": 3,
+    "JobName": "ExampleForget",
+    "Username":"Apache",
+    "Service": "restic-repo1",
+    "ResticArguments": ["-r", "/tmp/backup", "forget", "--keep-last", "30"]
+}
