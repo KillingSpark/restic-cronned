@@ -10,6 +10,19 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+func LoadJobFromFile(file *os.File) (*Job, error) {
+	var job = newJob()
+	jsonParser := json.NewDecoder(file)
+	err := jsonParser.Decode(job)
+	if err != nil {
+		return nil, err
+	}
+	job.retrieveAndStorePassword()
+	job.RegularTimer *= time.Second
+	job.RetryTimer *= time.Second
+	return job, nil
+}
+
 func FindJobs(path string) []*Job {
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
@@ -29,17 +42,13 @@ func FindJobs(path string) []*Job {
 			continue
 		}
 
-		var job = Job{}
-		jsonParser := json.NewDecoder(file)
-		err = jsonParser.Decode(&job)
+		job, err := LoadJobFromFile(file)
 		if err != nil {
 			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("Decodinf error")
 			continue
+		} else {
+			jobs = append(jobs, job)
 		}
-		job.retrieveAndStorePassword()
-		job.RegularTimer *= time.Second
-		job.RetryTimer *= time.Second
-		jobs = append(jobs, &job)
 	}
 
 	return jobs

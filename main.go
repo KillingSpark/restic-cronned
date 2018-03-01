@@ -14,7 +14,8 @@ func startDaemon() {
 	log.SetFormatter(&log.TextFormatter{})
 	logfile, err := os.OpenFile("/tmp/restic-cronned.log", os.O_CREATE|os.O_WRONLY, 0666)
 	if err == nil {
-		log.SetOutput(logfile)
+		//log.SetOutput(logfile)
+		_ = logfile
 	} else {
 		println(err.Error())
 		os.Exit(1)
@@ -27,6 +28,7 @@ func startDaemon() {
 		go output.StartServer(queue, port)
 	}
 	jobs := jobs.FindJobs(jobDirPath)
+	queue.Directory = jobDirPath
 	queue.AddJobs(jobs)
 	queue.Wg.Wait()
 }

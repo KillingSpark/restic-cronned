@@ -71,13 +71,5 @@ Serves the queue in json format at "/". Note that times are represented in nano-
 The status will maybe in the future be mapped to a string for better readability. Until then refer to the job.go file for semantics.  
 
 # Future plans #
-1. Better Logging (aka not to stdout...)
 1. Better configuration maybe using viper/cobra/...
-1. Be able to:
-* kill jobs
-* start new jobs
-* reload jobs
-* ...
-  
-1. Do the above over the http server
 

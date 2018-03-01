@@ -10,8 +10,17 @@ import (
 
 //StartServer blockingly starts the server that serves information abut the queue
 func StartServer(queue *jobs.JobQueue, port string) {
-	http.HandleFunc("/", func(wr http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/queue", func(wr http.ResponseWriter, r *http.Request) {
 		encodeQueue(queue, wr)
+	})
+	http.HandleFunc("/stop", func(wr http.ResponseWriter, r *http.Request) {
+		queue.StopJob(r.URL.Query().Get("name"))
+	})
+	http.HandleFunc("/restart", func(wr http.ResponseWriter, r *http.Request) {
+		queue.RestartJob(r.URL.Query().Get("name"))
+	})
+	http.HandleFunc("/reload", func(wr http.ResponseWriter, r *http.Request) {
+		queue.ReloadJob(r.URL.Query().Get("name"))
 	})
 	http.ListenAndServe(port, nil)
 }

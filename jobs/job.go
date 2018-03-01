@@ -37,20 +37,12 @@ type Job struct {
 	ResticArguments  []string `json:"ResticArguments"`
 }
 
-func newJob(regTimer, retTimer time.Duration, maxFailedRetries int, jobName, username, service, password string, resticArguments []string) *Job {
+func newJob() *Job {
 	return &Job{
-		RegularTimer:     regTimer,
-		RetryTimer:       retTimer,
-		failedRetries:    0,
-		MaxFailedRetries: maxFailedRetries,
-		Status:           statusReady,
-		Progress:         0,
-		stop:             make(chan bool),
-		JobName:          jobName,
-		Username:         username,
-		Service:          service,
-		password:         password,
-		ResticArguments:  resticArguments}
+		Status:   statusReady,
+		Progress: 0,
+		stop:     make(chan bool),
+	}
 }
 
 //JobReturn status returns from jobs
@@ -80,18 +72,19 @@ func (job *Job) retrieveAndStorePassword() {
 	job.password = key
 }
 
+//Stop stops a job it will exit after if has finished if currently running (this may take a while!) or exit immediatly if waiting
+func (job *Job) Stop() {
+	job.stop <- true
+	<-job.stop
+	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopped externally")
+}
+
 //loops until the cannel sends a message. Will send a message back when actually exited
 func (job *Job) loop(wg *sync.WaitGroup) {
 	job.Status = statusWaiting
 	defer func() { job.Status = statusFinished }()
 	defer wg.Done()
 	for {
-		select {
-		case _ = <-job.stop:
-			break
-		default:
-		}
-
 		startTime := time.Now()
 
 		var result JobReturn
@@ -111,11 +104,18 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 		endTime := time.Now().UnixNano()
 		used := endTime - startTime.UnixNano()
 
-		log.WithFields(log.Fields{"Job": job.JobName, "Used": strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64)}).Warning("successful")
+		log.WithFields(log.Fields{"Job": job.JobName, "Used": strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64)}).Info("successful")
 
-		time.Sleep(job.RegularTimer - time.Duration(used))
+		go func() {
+			time.Sleep(job.RegularTimer - time.Duration(used))
+			job.stop <- false
+		}()
+		doExit := <-job.stop
+		if doExit {
+			job.stop <- true
+			break
+		}
 	}
-	job.stop <- true
 }
 
 //reads the output from the command, extracts the percentage that is finished and updates the job accordingly
