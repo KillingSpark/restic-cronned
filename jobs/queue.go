@@ -46,7 +46,11 @@ func (queue *JobQueue) StopJob(name string) error {
 func (queue *JobQueue) RestartJob(name string) error {
 	job := queue.findJob(name)
 	if job != nil && job.Status == statusStopped {
-		queue.startJob(job)
+		job.Status = statusReady
+		err := queue.startJob(job)
+		if err != nil {
+			return err
+		}
 	} else {
 		return errors.New("No such Job")
 	}
