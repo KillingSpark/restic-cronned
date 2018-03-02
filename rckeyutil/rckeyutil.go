@@ -1,4 +1,4 @@
-package keyutil
+package main
 
 import (
 	"os"
@@ -16,7 +16,6 @@ func printKeyringUtilHelp() {
 //KeyRingUtil starts the keyring util for setting/getting/deleting passwords
 func KeyRingUtil() {
 	if len(os.Args) < 4 {
-		println(len(os.Args))
 		printKeyringUtilHelp()
 		return
 	}
@@ -43,5 +42,8 @@ func KeyRingUtil() {
 	if err != nil {
 		println(err.Error())
 	}
+}
 
+func main() {
+	KeyRingUtil()
 }

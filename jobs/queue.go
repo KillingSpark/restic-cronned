@@ -16,6 +16,22 @@ type JobQueue struct {
 	Directory string
 }
 
+//StartQueue starts all the jobs in the directory
+func (queue *JobQueue) StartQueue() {
+	jobs, err := FindJobs(queue.Directory)
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	queue.AddJobs(jobs)
+}
+
+//WaitForAllJobs does what it says it does
+func (queue *JobQueue) WaitForAllJobs() {
+	queue.Wg.Wait()
+}
+
+//StopJob stops the job with this name
 func (queue *JobQueue) StopJob(name string) error {
 	job := queue.findJob(name)
 	if job != nil {
@@ -26,9 +42,10 @@ func (queue *JobQueue) StopJob(name string) error {
 	return nil
 }
 
+//RestartJob restarts the job with this name if it is present and in the "stopped" State
 func (queue *JobQueue) RestartJob(name string) error {
 	job := queue.findJob(name)
-	if job != nil && job.Status == statusFinished {
+	if job != nil && job.Status == statusStopped {
 		queue.startJob(job)
 	} else {
 		return errors.New("No such Job")
@@ -36,6 +53,8 @@ func (queue *JobQueue) RestartJob(name string) error {
 	return nil
 }
 
+//ReloadJob reloads the file (with all changes made to it) and replaces the old job with the new one.
+//the old job is stopped (and waited for until stopped) before the new job is started
 func (queue *JobQueue) ReloadJob(name string) error {
 	oldJob := queue.findJob(name)
 
@@ -64,13 +83,17 @@ func (queue *JobQueue) ReloadJob(name string) error {
 			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("Decoding error")
 			continue
 		}
-		oldJob.Stop()
-		*oldJob = *job
-		queue.startJob(oldJob)
+		queue.replaceJob(job, oldJob)
 		return nil
 	}
 	log.WithFields(log.Fields{"Job": name}).Warning("No file for job")
 	return errors.New("File could not be found")
+}
+
+func (queue *JobQueue) replaceJob(newJob, oldJob *Job) {
+	oldJob.Stop()
+	*oldJob = *newJob
+	queue.startJob(oldJob)
 }
 
 func (queue *JobQueue) findJob(name string) *Job {
@@ -82,25 +105,45 @@ func (queue *JobQueue) findJob(name string) *Job {
 	return nil
 }
 
-func (queue *JobQueue) startJob(job *Job) {
+func (queue *JobQueue) startJob(job *Job) error {
+	if job.Status != statusReady {
+		return errors.New("Illegal state")
+	}
 	queue.Wg.Add(1)
 	go job.loop(queue.Wg)
+	return nil
 }
 
+//JobExists Check if this job is in the queue
 func (queue *JobQueue) JobExists(name string) bool {
 	return queue.findJob(name) != nil
 }
 
+//AddJobs adds the jobs to its list and starts them
 func (queue *JobQueue) AddJobs(jobs []*Job) {
 	for _, job := range jobs {
 		if j := queue.findJob(job.JobName); j != nil {
-			queue.StopJob(j.JobName)
+			queue.replaceJob(j, job)
+		} else {
+			queue.startJob(job)
 		}
-		queue.startJob(job)
 	}
 	queue.Jobs = append(queue.Jobs, jobs...)
 }
 
-func NewJobQueue() *JobQueue {
-	return &JobQueue{Wg: new(sync.WaitGroup), Jobs: make([]*Job, 0)}
+//NewJobQueue creates a new JobQueue for the given directory
+func NewJobQueue(path string) (*JobQueue, error) {
+	var err error
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, errors.New("Can not open" + path)
+	}
+	s, err := f.Stat()
+	if err != nil {
+		return nil, errors.New("Can not open" + path)
+	}
+	if dir := s.IsDir(); !dir {
+		return nil, errors.New(path + " is no directory")
+	}
+	return &JobQueue{Wg: new(sync.WaitGroup), Directory: path, Jobs: make([]*Job, 0)}, nil
 }

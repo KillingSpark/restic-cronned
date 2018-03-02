@@ -60,16 +60,22 @@ ExampleForget.json
 
 ## Passwords ##
 For convenience (and to be sure the keys can be read correctly from the keyring) the rckeyutil can be used to set/get/delete the repo keys.  
-If it is missing for you: its just a symlink to the main executable (it determines behaviour from the executables name)
+Usage:
 * rckeyutil set Service Username key
 * rckeyutil del Service Username
 * rckeyutil get Service Username
+Example with reference to the example jobs: `rckeyutil set restic-repo1 Apache 1234`
 
 ## Http server ##
-Started onyl if a port is given as the second commandline argument
-Serves the queue in json format at "/". Note that times are represented in nano-seconds internally.  
-The status will maybe in the future be mapped to a string for better readability. Until then refer to the job.go file for semantics.  
+Started only if a port is given as the second commandline argument  
+Serves the queue in json format at "/queue". Note that times are represented in nano-seconds internally.  
+Exposes commands as:  
+* /stop?name=JOBNAME
+* /restart?name=JOBNAME
+* /reload?name=JOBNAME <-- requires the file to be named JOBNAME.json
 
 # Future plans #
 1. Better configuration maybe using viper/cobra/...
+1. Check for locks in the repo of a job and wait until the lock is removed to prevent retries because of multiple jobs working on one repo
+1. Tool to wrap the commands to the http server. Users could use curl but... meh
 

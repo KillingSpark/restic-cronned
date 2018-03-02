@@ -2,51 +2,51 @@ package main
 
 import (
 	"os"
-	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/killingspark/restic-cronned/jobs"
-	"github.com/killingspark/restic-cronned/keyutil"
 	"github.com/killingspark/restic-cronned/output"
 )
 
-func startDaemon() {
+func setupLogging() error {
 	log.SetFormatter(&log.TextFormatter{})
 	logfile, err := os.OpenFile("/tmp/restic-cronned.log", os.O_CREATE|os.O_WRONLY, 0666)
 	if err == nil {
 		//log.SetOutput(logfile)
 		_ = logfile
 	} else {
-		println(err.Error())
-		os.Exit(1)
 		log.SetOutput(os.Stdout)
+		return err
 	}
-	queue := jobs.NewJobQueue()
+	return nil
+}
+
+func startDaemon() {
+	if len(os.Args) < 2 {
+		println("No directory specified")
+	}
+
 	jobDirPath := os.Args[1]
+	queue, err := jobs.NewJobQueue(jobDirPath)
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	queue.StartQueue()
+
 	if len(os.Args) > 2 {
 		port := os.Args[2]
 		go output.StartServer(queue, port)
 	}
-	jobs := jobs.FindJobs(jobDirPath)
-	queue.Directory = jobDirPath
-	queue.AddJobs(jobs)
-	queue.Wg.Wait()
+
+	queue.WaitForAllJobs()
 }
 
-const (
-	daemonSuffix  = "cronned"
-	keyringSuffix = "keyutil"
-)
-
 func main() {
-	//exename := os.Args[0]
-	//exename := "keyutil"
-	exename := "cronned"
-
-	if strings.HasSuffix(exename, daemonSuffix) {
-		startDaemon()
+	err := setupLogging()
+	if err != nil {
+		println(err.Error())
+		return
 	}
-	if strings.HasSuffix(exename, keyringSuffix) {
-		keyutil.KeyRingUtil()
-	}
+	startDaemon()
 }

@@ -55,21 +55,22 @@ const (
 )
 
 //JobStatus stati the jobs can be in
-type JobStatus int
+type JobStatus string
 
 const (
-	statusReady    JobStatus = 0
-	statusWaiting  JobStatus = 1
-	statusFinished JobStatus = 2
-	statusWorking  JobStatus = 3
+	statusReady   JobStatus = "ready"
+	statusWaiting JobStatus = "waiting"
+	statusStopped JobStatus = "stopped"
+	statusWorking JobStatus = "working"
 )
 
 func (job *Job) retrieveAndStorePassword() {
 	key, err := keyring.Get(job.Service, job.Username)
 	if err != nil {
 		log.WithFields(log.Fields{"Job": job.JobName}).Warning("couldn't retrieve password.")
+	} else {
+		job.password = key
 	}
-	job.password = key
 }
 
 //Stop stops a job it will exit after if has finished if currently running (this may take a while!) or exit immediatly if waiting
@@ -79,25 +80,27 @@ func (job *Job) Stop() {
 	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopped externally")
 }
 
-//loops until the cannel sends a message. Will send a message back when actually exited
+//loops until there is a "true" in the stop channel. Will send a "true" back when actually exited
 func (job *Job) loop(wg *sync.WaitGroup) {
 	job.Status = statusWaiting
-	defer func() { job.Status = statusFinished }()
+	defer func() { job.Status = statusStopped }()
 	defer wg.Done()
 	for {
 		startTime := time.Now()
 
 		var result JobReturn
-		job.failedRetries = 0
 		result = job.run()
+		job.failedRetries = 0
 		for result == returnRetry && (job.MaxFailedRetries < 0 || job.failedRetries < job.MaxFailedRetries) {
-			job.failedRetries++
 			time.Sleep(job.RetryTimer)
 			result = job.run()
+			if result != returnOk {
+				job.failedRetries++
+			}
 		}
 
 		if result != returnOk {
-			log.WithFields(log.Fields{"Job": job.JobName, "retries": strconv.Itoa(job.failedRetries)}).Warning("Stopping")
+			log.WithFields(log.Fields{"Job": job.JobName, "retries": strconv.Itoa(job.failedRetries)}).Error("Stopping")
 			break //break loop for job, it did fail completely
 		}
 
@@ -119,7 +122,7 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 }
 
 //reads the output from the command, extracts the percentage that is finished and updates the job accordingly
-//doesnt work currently because retic does some fancy printing that wont be catched outside a terminal
+//doesnt work currently because restic does some fancy printing that wont be catched outside a terminal
 func (job *Job) updateStatus(stdout io.ReadCloser) {
 	defer stdout.Close()
 	buf := make([]byte, 256)
@@ -157,9 +160,10 @@ func (job *Job) run() JobReturn {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
+	//doesnt work right now, see comment on updateStatus
 	//stdout, err := cmd.StdoutPipe()
 	//if err == nil {
-	//	go job.updateStatus(stdout) //doesnt work right now, see comment on func
+	//	go job.updateStatus(stdout)
 	//}
 	err := cmd.Run()
 

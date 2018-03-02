@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -23,10 +24,11 @@ func LoadJobFromFile(file *os.File) (*Job, error) {
 	return job, nil
 }
 
-func FindJobs(path string) []*Job {
+func FindJobs(path string) ([]*Job, error) {
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Fatal("Error opening the directory: " + err.Error())
+		return make([]*Job, 0), errors.New(path + " is no directory")
 	}
 
 	jobs := make([]*Job, 0)
@@ -44,12 +46,12 @@ func FindJobs(path string) []*Job {
 
 		job, err := LoadJobFromFile(file)
 		if err != nil {
-			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("Decodinf error")
+			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("Decoding error")
 			continue
 		} else {
 			jobs = append(jobs, job)
 		}
 	}
 
-	return jobs
+	return jobs, nil
 }
