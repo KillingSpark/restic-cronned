@@ -71,6 +71,7 @@ Started only if a port is given as the second commandline argument
 Serves the queue in json format at "/queue". Note that times are represented in nano-seconds internally.  
 Exposes commands as:  
 * /stop?name=JOBNAME
+* /stopall
 * /restart?name=JOBNAME
 * /reload?name=JOBNAME <-- requires the file to be named JOBNAME.json
 

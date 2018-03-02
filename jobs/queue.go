@@ -53,6 +53,13 @@ func (queue *JobQueue) RestartJob(name string) error {
 	return nil
 }
 
+//StopAllJobs can take a long time depending on the jobs
+func (queue *JobQueue) StopAllJobs() {
+	for _, job := range queue.Jobs {
+		job.Stop()
+	}
+}
+
 //ReloadJob reloads the file (with all changes made to it) and replaces the old job with the new one.
 //the old job is stopped (and waited for until stopped) before the new job is started
 func (queue *JobQueue) ReloadJob(name string) error {

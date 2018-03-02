@@ -22,6 +22,9 @@ func StartServer(queue *jobs.JobQueue, port string) {
 	http.HandleFunc("/reload", func(wr http.ResponseWriter, r *http.Request) {
 		queue.ReloadJob(r.URL.Query().Get("name"))
 	})
+	http.HandleFunc("/stopall", func(wr http.ResponseWriter, r *http.Request) {
+		queue.StopAllJobs()
+	})
 	http.ListenAndServe(port, nil)
 }
 
