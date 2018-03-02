@@ -74,9 +74,10 @@ Exposes commands as:
 * /stopall
 * /restart?name=JOBNAME
 * /reload?name=JOBNAME <-- requires the file to be named JOBNAME.json
+You can use the rccommand tool to do these for you if you dont wnat to use curl
 
 # Future plans #
 1. Better configuration maybe using viper/cobra/...
 1. Improve lock watching for repos. Right now there are still raceconditions. Every job can still fail once for every race he looses.
-1. Tool to wrap the commands to the http server. Users could use curl but... meh
+1. better output for/from the command-wrapper tool
 
