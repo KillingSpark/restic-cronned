@@ -24,6 +24,7 @@ func setupLogging() error {
 func startDaemon() {
 	if len(os.Args) < 2 {
 		println("No directory specified")
+		return
 	}
 
 	jobDirPath := os.Args[1]
