@@ -4,6 +4,7 @@ package jobs
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -144,6 +145,28 @@ func (job *Job) updateStatus(stdout io.ReadCloser) {
 		n, err = stdout.Read(buf)
 	}
 }
+func (job *Job) getRepo() string {
+	var repo string
+	for idx, arg := range job.ResticArguments {
+		if arg == "-r" && len(job.ResticArguments) > idx+2 {
+			repo = job.ResticArguments[idx+1]
+		}
+	}
+	return repo
+}
+func (job *Job) waitForRepoForLock() {
+	files, err := ioutil.ReadDir(job.getRepo() + "/locks")
+	if err != nil {
+		return
+	}
+	for len(files) > 0 {
+		time.Sleep(10 * time.Millisecond)
+		files, err = ioutil.ReadDir(job.getRepo() + "/locks")
+		if err != nil {
+			return
+		}
+	}
+}
 
 func (job *Job) run() JobReturn {
 	job.Status = statusWorking
@@ -165,6 +188,7 @@ func (job *Job) run() JobReturn {
 	//if err == nil {
 	//	go job.updateStatus(stdout)
 	//}
+	job.waitForRepoForLock()
 	err := cmd.Run()
 
 	var exitCode = 0

@@ -76,6 +76,6 @@ Exposes commands as:
 
 # Future plans #
 1. Better configuration maybe using viper/cobra/...
-1. Check for locks in the repo of a job and wait until the lock is removed to prevent retries because of multiple jobs working on one repo
+1. Improve lock watching for repos. Right now there are still raceconditions. Every job can still fail once for every race he looses.
 1. Tool to wrap the commands to the http server. Users could use curl but... meh
 
