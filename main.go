@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/killingspark/restic-cronned/jobs"
@@ -10,10 +11,10 @@ import (
 
 func setupLogging() error {
 	log.SetFormatter(&log.TextFormatter{})
-	logfile, err := os.OpenFile("/tmp/restic-cronned.log", os.O_CREATE|os.O_WRONLY, 0666)
+	logpath := os.ExpandEnv("$HOME/.cache")
+	logfile, err := os.OpenFile(path.Join(logpath, "restic-cronned.log"), os.O_CREATE|os.O_WRONLY, 0666)
 	if err == nil {
-		//log.SetOutput(logfile)
-		_ = logfile
+		log.SetOutput(logfile)
 	} else {
 		log.SetOutput(os.Stdout)
 		return err
