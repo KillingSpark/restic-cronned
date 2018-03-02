@@ -76,6 +76,7 @@ func (job *Job) retrieveAndStorePassword() {
 
 //Stop stops a job it will exit after if has finished if currently running (this may take a while!) or exit immediatly if waiting
 func (job *Job) Stop() {
+	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopping externally")
 	job.stop <- true
 	<-job.stop
 	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopped externally")
@@ -93,7 +94,12 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 		result = job.run()
 		job.failedRetries = 0
 		for result == returnRetry && (job.MaxFailedRetries < 0 || job.failedRetries < job.MaxFailedRetries) {
-			time.Sleep(job.RetryTimer)
+			go delaySignal(job.stop, false, job.RetryTimer)
+			sig := <-job.stop
+			if sig {
+				job.stop <- true
+				return
+			}
 			result = job.run()
 			if result != returnOk {
 				job.failedRetries++
@@ -110,16 +116,18 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 
 		log.WithFields(log.Fields{"Job": job.JobName, "Used": strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64)}).Info("successful")
 
-		go func() {
-			time.Sleep(job.RegularTimer - time.Duration(used))
-			job.stop <- false
-		}()
+		go delaySignal(job.stop, false, job.RegularTimer-time.Duration(used))
 		doExit := <-job.stop
 		if doExit {
 			job.stop <- true
 			break
 		}
 	}
+}
+
+func delaySignal(signal chan bool, msg bool, dur time.Duration) {
+	time.Sleep(dur)
+	signal <- msg
 }
 
 //reads the output from the command, extracts the percentage that is finished and updates the job accordingly
