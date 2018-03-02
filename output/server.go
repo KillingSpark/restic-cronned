@@ -14,16 +14,26 @@ func StartServer(queue *jobs.JobQueue, port string) {
 		encodeQueue(queue, wr)
 	})
 	http.HandleFunc("/stop", func(wr http.ResponseWriter, r *http.Request) {
-		queue.StopJob(r.URL.Query().Get("name"))
+		err := queue.StopJob(r.URL.Query().Get("name"))
+		if err != nil {
+			wr.Write([]byte(err.Error()))
+		}
 	})
 	http.HandleFunc("/restart", func(wr http.ResponseWriter, r *http.Request) {
-		queue.RestartJob(r.URL.Query().Get("name"))
+		err := queue.RestartJob(r.URL.Query().Get("name"))
+		if err != nil {
+			wr.Write([]byte(err.Error()))
+		}
 	})
 	http.HandleFunc("/reload", func(wr http.ResponseWriter, r *http.Request) {
-		queue.ReloadJob(r.URL.Query().Get("name"))
+		err := queue.ReloadJob(r.URL.Query().Get("name"))
+		if err != nil {
+			wr.Write([]byte(err.Error()))
+		}
 	})
 	http.HandleFunc("/stopall", func(wr http.ResponseWriter, r *http.Request) {
 		queue.StopAllJobs()
+		wr.Write([]byte("Done"))
 	})
 	http.ListenAndServe(port, nil)
 }
