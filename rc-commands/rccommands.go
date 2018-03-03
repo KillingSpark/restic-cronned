@@ -77,7 +77,7 @@ func main() {
 	if err != nil {
 		println(err.Error())
 	} else {
-		if resp.Body != nil {
+		if resp != nil && resp.Body != nil {
 			io.Copy(os.Stdout, resp.Body)
 			println("")
 		}
