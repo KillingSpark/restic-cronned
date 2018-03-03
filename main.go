@@ -12,7 +12,7 @@ import (
 func setupLogging() error {
 	log.SetFormatter(&log.TextFormatter{})
 	logpath := os.ExpandEnv("$HOME/.cache")
-	logfile, err := os.OpenFile(path.Join(logpath, "restic-cronned.log"), os.O_CREATE|os.O_WRONLY, 0666)
+	logfile, err := os.OpenFile(path.Join(logpath, "restic-cronned.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err == nil {
 		log.SetOutput(logfile)
 	} else {
@@ -42,6 +42,7 @@ func startDaemon() {
 	}
 
 	queue.WaitForAllJobs()
+	log.Info("All Jobs stopped")
 }
 
 func main() {
