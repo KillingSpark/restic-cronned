@@ -3,6 +3,7 @@
     "retryTimer": 3600,
     "maxFailedRetries": 2,
     "JobName": "ExampleBackup",
+    "NextJob": "ExampleForget",
     "Username":"Apache",
     "Service": "restic-repo1",
     "ResticArguments": ["-r", "/tmp/backup", "backup", "/var/www/my-site"]

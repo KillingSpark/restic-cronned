@@ -1,5 +1,5 @@
 {
-    "regularTimer": 86400,
+    "regularTimer": -1,
     "retryTimer": 3600,
     "maxFailedRetries": 3,
     "JobName": "ExampleForget",

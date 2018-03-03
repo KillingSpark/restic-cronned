@@ -32,6 +32,10 @@ type Job struct {
 	WaitStart        time.Duration `json:"WaitStart"`
 	WaitEnd          time.Duration `json:"WaitEnd"`
 	stop             chan bool
+	stopAnswer       chan bool
+	trigger          chan int
+	queue            *JobQueue
+	JobNameToTrigger string `json:"NextJob"`
 	JobName          string `json:"JobName"`
 	Username         string `json:"Username"`
 	Service          string `json:"Service"`
@@ -42,9 +46,11 @@ type Job struct {
 
 func newJob() *Job {
 	return &Job{
-		Status:   statusReady,
-		Progress: 0,
-		stop:     make(chan bool),
+		Status:     statusReady,
+		Progress:   0,
+		stop:       make(chan bool),
+		stopAnswer: make(chan bool),
+		trigger:    make(chan int),
 	}
 }
 
@@ -80,8 +86,32 @@ func (job *Job) retrieveAndStorePassword() {
 func (job *Job) Stop() {
 	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopping externally")
 	job.stop <- true
-	<-job.stop
+	<-job.stopAnswer
 	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopped externally")
+}
+
+//Trigger makes the job  run immediatly (if waiting or immediatly again if working right now)
+func (job *Job) Trigger() {
+	if job.Status == statusWaiting || job.Status == statusWorking {
+		job.trigger <- 0
+	}
+}
+
+//TriggerWithDelay makes the job run after "dur" nanoseconds
+func (job *Job) TriggerWithDelay(dur time.Duration) {
+	job.WaitStart = time.Duration(time.Now().UnixNano())
+	job.WaitEnd = job.WaitStart + dur
+
+	time.Sleep(dur)
+
+	job.Trigger()
+}
+
+func (job *Job) triggerNextJob() {
+	toTrigger := job.queue.findJob(job.JobNameToTrigger)
+	if toTrigger != nil {
+		toTrigger.Trigger()
+	}
 }
 
 //loops until there is a "true" in the stop channel. Will send a "true" back when actually exited
@@ -89,7 +119,20 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 	job.Status = statusWaiting
 	defer func() { job.Status = statusStopped }()
 	defer wg.Done()
-	for {
+	var terminate = false
+	for !terminate {
+		if job.RegularTimer > 0 {
+			go job.TriggerWithDelay(job.RegularTimer)
+		}
+
+		select {
+		case <-job.stop:
+			job.stopAnswer <- true
+			terminate = true
+			continue
+		case <-job.trigger:
+		}
+
 		startTime := time.Now()
 
 		var result JobReturn
@@ -99,39 +142,24 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 			if result != returnOk {
 				job.CurrentRetry++
 			}
-			go job.delaySignal(false, job.RetryTimer)
-			sig := <-job.stop
-			if sig {
-				job.stop <- true
-				return
-			}
+			go job.TriggerWithDelay(job.RetryTimer)
+			<-job.trigger
 			result = job.run()
 		}
+		job.CurrentRetry = 0
 
 		if result != returnOk {
 			log.WithFields(log.Fields{"Job": job.JobName, "retries": strconv.Itoa(job.CurrentRetry)}).Error("Stopping")
-			break //break loop for job, it did fail completely
+			job.stop <- true
+			continue
 		}
-
 		endTime := time.Now().UnixNano()
 		used := endTime - startTime.UnixNano()
 
+		go job.triggerNextJob()
+
 		log.WithFields(log.Fields{"Job": job.JobName, "Used": strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64)}).Info("successful")
-
-		go job.delaySignal(false, job.RegularTimer-time.Duration(used))
-		doExit := <-job.stop
-		if doExit {
-			job.stop <- true
-			break
-		}
 	}
-}
-
-func (job *Job) delaySignal(msg bool, dur time.Duration) {
-	job.WaitStart = time.Duration(time.Now().UnixNano())
-	job.WaitEnd = job.WaitStart + dur
-	time.Sleep(dur)
-	job.stop <- msg
 }
 
 //reads the output from the command, extracts the percentage that is finished and updates the job accordingly

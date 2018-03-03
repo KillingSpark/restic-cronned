@@ -95,6 +95,7 @@ func (queue *JobQueue) ReloadJob(name string) error {
 			continue
 		}
 		queue.replaceJob(job, oldJob)
+		queue.RestartJob(job.JobName)
 		return nil
 	}
 	log.WithFields(log.Fields{"Job": name}).Warning("No file for job")
@@ -104,7 +105,6 @@ func (queue *JobQueue) ReloadJob(name string) error {
 func (queue *JobQueue) replaceJob(newJob, oldJob *Job) {
 	oldJob.Stop()
 	*oldJob = *newJob
-	queue.startJob(oldJob)
 }
 
 func (queue *JobQueue) findJob(name string) *Job {
@@ -121,6 +121,7 @@ func (queue *JobQueue) startJob(job *Job) error {
 		return errors.New("Illegal state")
 	}
 	queue.Wg.Add(1)
+	job.queue = queue
 	go job.loop(queue.Wg)
 	return nil
 }
@@ -133,13 +134,13 @@ func (queue *JobQueue) JobExists(name string) bool {
 //AddJobs adds the jobs to its list and starts them
 func (queue *JobQueue) AddJobs(jobs []*Job) {
 	for _, job := range jobs {
-		if j := queue.findJob(job.JobName); j != nil {
-			queue.replaceJob(j, job)
+		if oldJob := queue.findJob(job.JobName); oldJob != nil {
+			queue.replaceJob(job, oldJob)
 		} else {
-			queue.startJob(job)
+			queue.Jobs = append(queue.Jobs, job)
 		}
+		queue.startJob(job)
 	}
-	queue.Jobs = append(queue.Jobs, jobs...)
 }
 
 //NewJobQueue creates a new JobQueue for the given directory
