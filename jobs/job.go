@@ -25,10 +25,12 @@ var (
 type Job struct {
 	RegularTimer     time.Duration `json:"regularTimer"`
 	RetryTimer       time.Duration `json:"retryTimer"`
-	failedRetries    int
-	MaxFailedRetries int       `json:"maxFailedRetries"`
-	Status           JobStatus `json:"status"`
-	Progress         float64   `json:"progress"`
+	CurrentRetry     int           `json:"CurrentRetry"`
+	MaxFailedRetries int           `json:"maxFailedRetries"`
+	Status           JobStatus     `json:"status"`
+	Progress         float64       `json:"progress"`
+	WaitStart        time.Duration `json:"WaitStart"`
+	WaitEnd          time.Duration `json:"WaitEnd"`
 	stop             chan bool
 	JobName          string `json:"JobName"`
 	Username         string `json:"Username"`
@@ -92,22 +94,22 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 
 		var result JobReturn
 		result = job.run()
-		job.failedRetries = 0
-		for result == returnRetry && (job.MaxFailedRetries < 0 || job.failedRetries < job.MaxFailedRetries) {
-			go delaySignal(job.stop, false, job.RetryTimer)
+		job.CurrentRetry = 0
+		for result == returnRetry && (job.MaxFailedRetries < 0 || job.CurrentRetry < job.MaxFailedRetries) {
+			if result != returnOk {
+				job.CurrentRetry++
+			}
+			go job.delaySignal(false, job.RetryTimer)
 			sig := <-job.stop
 			if sig {
 				job.stop <- true
 				return
 			}
 			result = job.run()
-			if result != returnOk {
-				job.failedRetries++
-			}
 		}
 
 		if result != returnOk {
-			log.WithFields(log.Fields{"Job": job.JobName, "retries": strconv.Itoa(job.failedRetries)}).Error("Stopping")
+			log.WithFields(log.Fields{"Job": job.JobName, "retries": strconv.Itoa(job.CurrentRetry)}).Error("Stopping")
 			break //break loop for job, it did fail completely
 		}
 
@@ -116,7 +118,7 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 
 		log.WithFields(log.Fields{"Job": job.JobName, "Used": strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64)}).Info("successful")
 
-		go delaySignal(job.stop, false, job.RegularTimer-time.Duration(used))
+		go job.delaySignal(false, job.RegularTimer-time.Duration(used))
 		doExit := <-job.stop
 		if doExit {
 			job.stop <- true
@@ -125,9 +127,11 @@ func (job *Job) loop(wg *sync.WaitGroup) {
 	}
 }
 
-func delaySignal(signal chan bool, msg bool, dur time.Duration) {
+func (job *Job) delaySignal(msg bool, dur time.Duration) {
+	job.WaitStart = time.Duration(time.Now().UnixNano())
+	job.WaitEnd = job.WaitStart + dur
 	time.Sleep(dur)
-	signal <- msg
+	job.stop <- msg
 }
 
 //reads the output from the command, extracts the percentage that is finished and updates the job accordingly
