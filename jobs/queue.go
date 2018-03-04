@@ -121,8 +121,7 @@ func (queue *JobQueue) startJob(job *Job) error {
 		return errors.New("Illegal state")
 	}
 	queue.Wg.Add(1)
-	job.queue = queue
-	go job.loop(queue.Wg)
+	job.start(queue)
 	return nil
 }
 

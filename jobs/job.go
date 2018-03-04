@@ -4,12 +4,10 @@ package jobs
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -31,6 +29,7 @@ type Job struct {
 	Progress         float64       `json:"progress"`
 	WaitStart        time.Duration `json:"WaitStart"`
 	WaitEnd          time.Duration `json:"WaitEnd"`
+	lastSuccess      int64
 	stop             chan bool
 	stopAnswer       chan bool
 	trigger          chan int
@@ -82,84 +81,106 @@ func (job *Job) retrieveAndStorePassword() {
 	}
 }
 
-//Stop stops a job it will exit after if has finished if currently running (this may take a while!) or exit immediatly if waiting
-func (job *Job) Stop() {
-	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopping externally")
-	job.stop <- true
-	<-job.stopAnswer
-	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopped externally")
-}
-
-//Trigger makes the job  run immediatly (if waiting or immediatly again if working right now)
-func (job *Job) Trigger() {
+//SendTrigger makes the job  run immediatly (if waiting or immediatly again if working right now)
+func (job *Job) SendTrigger() {
 	if job.Status == statusWaiting || job.Status == statusWorking {
 		job.trigger <- 0
 	}
 }
 
-//TriggerWithDelay makes the job run after "dur" nanoseconds
-func (job *Job) TriggerWithDelay(dur time.Duration) {
+//SendTriggerWithDelay makes the job run after "dur" nanoseconds
+func (job *Job) SendTriggerWithDelay(dur time.Duration) {
+	if dur < 0 {
+		return
+	}
 	job.WaitStart = time.Duration(time.Now().UnixNano())
 	job.WaitEnd = job.WaitStart + dur
 
 	time.Sleep(dur)
 
-	job.Trigger()
+	job.SendTrigger()
 }
 
 func (job *Job) triggerNextJob() {
 	toTrigger := job.queue.findJob(job.JobNameToTrigger)
 	if toTrigger != nil {
-		toTrigger.Trigger()
+		toTrigger.SendTrigger()
 	}
 }
 
-//loops until there is a "true" in the stop channel. Will send a "true" back when actually exited
-func (job *Job) loop(wg *sync.WaitGroup) {
-	job.Status = statusWaiting
+func (job *Job) loop() {
 	defer func() { job.Status = statusStopped }()
-	defer wg.Done()
-	var terminate = false
-	for !terminate {
-		if job.RegularTimer > 0 {
-			go job.TriggerWithDelay(job.RegularTimer)
-		}
-
+	defer job.finish()
+	job.Status = statusWaiting
+	for {
 		select {
+		case <-job.trigger:
 		case <-job.stop:
 			job.stopAnswer <- true
-			terminate = true
-			continue
-		case <-job.trigger:
+			return
 		}
 
-		startTime := time.Now()
-
-		var result JobReturn
-		result = job.run()
-		job.CurrentRetry = 0
-		for result == returnRetry && (job.MaxFailedRetries < 0 || job.CurrentRetry < job.MaxFailedRetries) {
-			if result != returnOk {
-				job.CurrentRetry++
+		result := job.run()
+		switch result {
+		case returnRetry:
+			if job.CurrentRetry < job.MaxFailedRetries {
+				job.retry()
+			} else {
+				job.fail()
 			}
-			go job.TriggerWithDelay(job.RetryTimer)
-			<-job.trigger
-			result = job.run()
+			break
+		case returnOk:
+			job.success()
+			break
+		case returnStop:
+			job.fail()
+			break
 		}
-		job.CurrentRetry = 0
-
-		if result != returnOk {
-			log.WithFields(log.Fields{"Job": job.JobName, "retries": strconv.Itoa(job.CurrentRetry)}).Error("Stopping")
-			job.stop <- true
-			continue
-		}
-		endTime := time.Now().UnixNano()
-		used := endTime - startTime.UnixNano()
-
-		go job.triggerNextJob()
-
-		log.WithFields(log.Fields{"Job": job.JobName, "Used": strconv.FormatFloat(float64(used)/float64(time.Second), 'f', 6, 64)}).Info("successful")
 	}
+}
+
+func (job *Job) start(queue *JobQueue) {
+	job.queue = queue
+	job.lastSuccess = time.Now().UnixNano()
+	go job.SendTriggerWithDelay(job.RegularTimer)
+	go job.loop()
+}
+
+func (job *Job) retry() {
+	job.CurrentRetry++
+	go job.SendTriggerWithDelay(job.RetryTimer)
+}
+
+func (job *Job) success() {
+	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Info("successful")
+	job.CurrentRetry = 0
+
+	if job.RegularTimer > 0 {
+		timeTaken := time.Duration(time.Now().UnixNano()-job.lastSuccess) - job.RegularTimer
+		job.lastSuccess = time.Now().UnixNano()
+		toWait := job.RegularTimer - timeTaken
+		go job.SendTriggerWithDelay(toWait)
+	}
+
+	go job.triggerNextJob()
+}
+
+//Stop stops a job it will exit after if has finished if currently running (this may take a while!) or exit immediatly if waiting
+func (job *Job) Stop() {
+	log.WithFields(log.Fields{"Job": job.JobName}).Info("Stopped externally")
+	job.stop <- true
+	<-job.stopAnswer
+}
+
+func (job *Job) fail() {
+	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Error("Failed")
+	job.stop <- true
+	<-job.stopAnswer
+}
+
+func (job *Job) finish() {
+	job.Status = statusStopped
+	job.queue.Wg.Done()
 }
 
 //reads the output from the command, extracts the percentage that is finished and updates the job accordingly
@@ -194,19 +215,6 @@ func (job *Job) getRepo() string {
 	}
 	return repo
 }
-func (job *Job) waitForRepoForLock() {
-	files, err := ioutil.ReadDir(job.getRepo() + "/locks")
-	if err != nil {
-		return
-	}
-	for len(files) > 0 {
-		time.Sleep(10 * time.Millisecond)
-		files, err = ioutil.ReadDir(job.getRepo() + "/locks")
-		if err != nil {
-			return
-		}
-	}
-}
 
 func (job *Job) run() JobReturn {
 	job.Status = statusWorking
@@ -228,7 +236,6 @@ func (job *Job) run() JobReturn {
 	//if err == nil {
 	//	go job.updateStatus(stdout)
 	//}
-	job.waitForRepoForLock()
 	err := cmd.Run()
 
 	var exitCode = 0
