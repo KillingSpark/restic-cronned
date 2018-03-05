@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -24,11 +25,11 @@ func LoadJobFromFile(file *os.File) (*Job, error) {
 	return job, nil
 }
 
-func FindJobs(path string) ([]*Job, error) {
-	files, err := ioutil.ReadDir(path)
+func FindJobs(dirPath string) ([]*Job, error) {
+	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
 		log.Fatal("Error opening the directory: " + err.Error())
-		return make([]*Job, 0), errors.New(path + " is no directory")
+		return make([]*Job, 0), errors.New(dirPath + " is no directory")
 	}
 
 	jobs := make([]*Job, 0)
@@ -38,7 +39,7 @@ func FindJobs(path string) ([]*Job, error) {
 			continue
 		}
 
-		file, err := os.Open(f.Name())
+		file, err := os.Open(path.Join(dirPath, f.Name()))
 		if err != nil {
 			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("File error")
 			continue
