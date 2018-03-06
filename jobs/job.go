@@ -33,7 +33,7 @@ type Job struct {
 	stop             chan bool
 	stopAnswer       chan bool
 	trigger          chan TriggerType
-	queue            *JobQueue
+	jobstore         JobStore
 	JobNameToTrigger string `json:"NextJob"`
 	JobName          string `json:"JobName"`
 	Username         string `json:"Username"`
@@ -110,19 +110,25 @@ func (job *Job) SendTriggerWithDelay(dur time.Duration) {
 }
 
 func (job *Job) triggerNextJob() {
-	toTrigger, _ := job.queue.findJob(job.JobNameToTrigger)
+	toTrigger, _ := job.jobstore.FindJob(job.JobNameToTrigger)
 	if toTrigger != nil {
 		toTrigger.SendTrigger(triggerIntern)
 	}
 }
 
-func (job *Job) loop() {
-	defer func() { job.Status = statusStopped }()
-	defer job.finish()
+func (job *Job) loop(finishCallback func()) {
+	defer job.finish(finishCallback)
 	job.Status = statusWaiting
 	for {
+		var retrigger = false
 		select {
-		case <-job.trigger:
+		case trigType := <-job.trigger:
+			switch trigType {
+			case triggerIntern:
+				retrigger = true
+			case triggerExtern:
+				retrigger = false
+			}
 		case <-job.stop:
 			job.stopAnswer <- true
 			return
@@ -135,23 +141,24 @@ func (job *Job) loop() {
 				job.retry()
 			} else {
 				job.fail()
+				return
 			}
 			break
 		case returnOk:
-			job.success()
+			job.success(retrigger)
 			break
 		case returnStop:
 			job.fail()
-			break
+			return
 		}
 	}
 }
 
-func (job *Job) start(queue *JobQueue) {
-	job.queue = queue
+func (job *Job) start(store JobStore, finishCallback func()) {
+	job.jobstore = store
 	job.lastSuccess = time.Now().UnixNano()
 	go job.SendTriggerWithDelay(job.RegularTimer)
-	go job.loop()
+	go job.loop(finishCallback)
 }
 
 func (job *Job) retry() {
@@ -159,15 +166,17 @@ func (job *Job) retry() {
 	go job.SendTriggerWithDelay(job.RetryTimer)
 }
 
-func (job *Job) success() {
+func (job *Job) success(retrigger bool) {
 	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Info("successful")
 	job.CurrentRetry = 0
 
-	if job.RegularTimer > 0 {
-		timeTaken := time.Duration(time.Now().UnixNano()-job.lastSuccess) - job.RegularTimer
-		job.lastSuccess = time.Now().UnixNano()
-		toWait := job.RegularTimer - timeTaken
-		go job.SendTriggerWithDelay(toWait)
+	if retrigger {
+		if job.RegularTimer > 0 {
+			timeTaken := time.Duration(time.Now().UnixNano()-job.lastSuccess) - job.RegularTimer
+			job.lastSuccess = time.Now().UnixNano()
+			toWait := job.RegularTimer - timeTaken
+			go job.SendTriggerWithDelay(toWait)
+		}
 	}
 
 	go job.triggerNextJob()
@@ -182,13 +191,12 @@ func (job *Job) Stop() {
 
 func (job *Job) fail() {
 	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Error("Failed")
-	job.stop <- true
-	<-job.stopAnswer
 }
 
-func (job *Job) finish() {
+func (job *Job) finish(finishCallback func()) {
+	log.WithFields(log.Fields{"Job": job.JobName}).Error("Finished")
 	job.Status = statusStopped
-	job.queue.Wg.Done()
+	finishCallback()
 }
 
 //reads the output from the command, extracts the percentage that is finished and updates the job accordingly

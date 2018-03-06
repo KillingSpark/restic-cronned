@@ -10,6 +10,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+//JobStore can have your job
+type JobStore interface {
+	FindJob(name string) (*Job, int)
+}
+
 //JobQueue managing the jobs
 type JobQueue struct {
 	Jobs      []*Job `json:"Jobs"`
@@ -24,7 +29,7 @@ func (queue *JobQueue) StartQueue() {
 		println(err.Error())
 		return
 	}
-	queue.AddJobs(jobs)
+	queue.AddJobs(jobs...)
 }
 
 //WaitForAllJobs does what it says it does
@@ -34,7 +39,7 @@ func (queue *JobQueue) WaitForAllJobs() {
 
 //StopJob stops the job with this name
 func (queue *JobQueue) StopJob(name string) error {
-	job, _ := queue.findJob(name)
+	job, _ := queue.FindJob(name)
 	if job != nil {
 		job.Stop()
 	} else {
@@ -43,6 +48,7 @@ func (queue *JobQueue) StopJob(name string) error {
 	return nil
 }
 
+//RemoveJob stops the job and then removes it from the queue
 func (queue *JobQueue) RemoveJob(name string) error {
 	for idx, job := range queue.Jobs {
 		if job.JobName == name {
@@ -54,8 +60,9 @@ func (queue *JobQueue) RemoveJob(name string) error {
 	return errors.New("No such job")
 }
 
+//TriggerJob triggers the job with the extern trigger so it doesnt trigger itself afterwards
 func (queue *JobQueue) TriggerJob(name string) error {
-	job, _ := queue.findJob(name)
+	job, _ := queue.FindJob(name)
 	if job != nil {
 		job.SendTrigger(triggerExtern)
 	} else {
@@ -66,7 +73,7 @@ func (queue *JobQueue) TriggerJob(name string) error {
 
 //RestartJob restarts the job with this name if it is present and in the "stopped" State
 func (queue *JobQueue) RestartJob(name string) error {
-	job, _ := queue.findJob(name)
+	job, _ := queue.FindJob(name)
 	if job != nil && job.Status == statusStopped {
 		job.Status = statusReady
 		err := queue.startJob(job)
@@ -89,7 +96,7 @@ func (queue *JobQueue) StopAllJobs() {
 //ReloadJob reloads the file (with all changes made to it) and replaces the old job with the new one.
 //the old job is stopped (and waited for until stopped) before the new job is started
 func (queue *JobQueue) ReloadJob(name string) error {
-	oldJob, _ := queue.findJob(name)
+	oldJob, _ := queue.FindJob(name)
 
 	if oldJob == nil {
 		return errors.New("No such job")
@@ -131,11 +138,11 @@ func (queue *JobQueue) replaceJob(newJob, oldJob *Job) {
 	if oldJob.Status != statusWaiting {
 		oldJob.Stop()
 	}
-	_, idx := queue.findJob(oldJob.JobName)
+	_, idx := queue.FindJob(oldJob.JobName)
 	queue.Jobs[idx] = newJob
 }
 
-func (queue *JobQueue) findJob(name string) (*Job, int) {
+func (queue *JobQueue) FindJob(name string) (*Job, int) {
 	for idx, job := range queue.Jobs {
 		if job.JobName == name {
 			return job, idx
@@ -149,20 +156,20 @@ func (queue *JobQueue) startJob(job *Job) error {
 		return errors.New("Illegal state")
 	}
 	queue.Wg.Add(1)
-	job.start(queue)
+	job.start(queue, func() { queue.Wg.Done() })
 	return nil
 }
 
 //JobExists Check if this job is in the queue
 func (queue *JobQueue) JobExists(name string) bool {
-	job, _ := queue.findJob(name)
+	job, _ := queue.FindJob(name)
 	return job != nil
 }
 
 //AddJobs adds the jobs to its list and starts them
-func (queue *JobQueue) AddJobs(jobs []*Job) {
+func (queue *JobQueue) AddJobs(jobs ...*Job) {
 	for _, job := range jobs {
-		if oldJob, _ := queue.findJob(job.JobName); oldJob != nil {
+		if oldJob, _ := queue.FindJob(job.JobName); oldJob != nil {
 			queue.replaceJob(job, oldJob)
 		} else {
 			queue.Jobs = append(queue.Jobs, job)

@@ -12,6 +12,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+//LoadJobFromFile loads  job from a file
 func LoadJobFromFile(file *os.File) (*Job, error) {
 	var job = newJob()
 	jsonParser := json.NewDecoder(file)
@@ -25,6 +26,7 @@ func LoadJobFromFile(file *os.File) (*Job, error) {
 	return job, nil
 }
 
+//FindJobs loads all jobs from the path
 func FindJobs(dirPath string) ([]*Job, error) {
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
