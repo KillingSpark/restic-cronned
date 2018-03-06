@@ -17,6 +17,8 @@ func StartServer(queue *jobs.JobQueue, port string) {
 		err := queue.StopJob(r.URL.Query().Get("name"))
 		if err != nil {
 			wr.Write([]byte(err.Error()))
+		} else {
+			wr.Write([]byte("Done"))
 		}
 	})
 	http.HandleFunc("/restart", func(wr http.ResponseWriter, r *http.Request) {
@@ -29,18 +31,24 @@ func StartServer(queue *jobs.JobQueue, port string) {
 		err := queue.ReloadJob(r.URL.Query().Get("name"))
 		if err != nil {
 			wr.Write([]byte(err.Error()))
+		} else {
+			wr.Write([]byte("Done"))
 		}
 	})
 	http.HandleFunc("/trigger", func(wr http.ResponseWriter, r *http.Request) {
 		err := queue.TriggerJob(r.URL.Query().Get("name"))
 		if err != nil {
 			wr.Write([]byte(err.Error()))
+		} else {
+			wr.Write([]byte("Done"))
 		}
 	})
 	http.HandleFunc("/remove", func(wr http.ResponseWriter, r *http.Request) {
 		err := queue.RemoveJob(r.URL.Query().Get("name"))
 		if err != nil {
 			wr.Write([]byte(err.Error()))
+		} else {
+			wr.Write([]byte("Done"))
 		}
 	})
 	http.HandleFunc("/stopall", func(wr http.ResponseWriter, r *http.Request) {
