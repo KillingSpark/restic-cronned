@@ -23,57 +23,22 @@ func main() {
 		return
 	}
 	var resp *http.Response
+	var req *http.Request
 	var err error
-	switch os.Args[2] {
-	case cmdStopAll:
-		req, err := http.NewRequest("GET", "http://"+os.Args[1]+"/"+cmdStopAll, nil)
-		if err != nil {
-			println(err.Error())
-			return
-		}
-		client := http.Client{}
-		resp, err = client.Do(req)
-		break
-	case cmdStop:
-		if len(os.Args) < 4 {
-			printUsage()
-			return
-		}
-		req, err := http.NewRequest("GET", "http://"+os.Args[1]+"/"+cmdStop+"?name="+os.Args[3], nil)
-		if err != nil {
-			println(err.Error())
-			return
-		}
-		client := http.Client{}
-		resp, err = client.Do(req)
-		break
-	case cmdRestart:
-		if len(os.Args) < 4 {
-			printUsage()
-			return
-		}
-		req, err := http.NewRequest("GET", "http://"+os.Args[1]+"/"+cmdRestart+"?name="+os.Args[3], nil)
-		if err != nil {
-			println(err.Error())
-			return
-		}
-		client := http.Client{}
-		resp, err = client.Do(req)
-		break
-	case cmdReload:
-		if len(os.Args) < 4 {
-			printUsage()
-			return
-		}
-		req, err := http.NewRequest("GET", "http://"+os.Args[1]+"/"+cmdReload+"?name="+os.Args[3], nil)
-		if err != nil {
-			println(err.Error())
-			return
-		}
-		client := http.Client{}
-		resp, err = client.Do(req)
-		break
+	if len(os.Args) > 3 {
+		req, err = http.NewRequest("GET", "http://"+os.Args[1]+"/"+os.Args[2]+"?name="+os.Args[3], nil)
+	} else {
+		req, err = http.NewRequest("GET", "http://"+os.Args[1]+"/"+os.Args[2], nil)
 	}
+
+	if err != nil {
+		println(err.Error())
+		return
+	}
+
+	c := http.Client{}
+	resp, err = c.Do(req)
+
 	if err != nil {
 		println(err.Error())
 	} else {

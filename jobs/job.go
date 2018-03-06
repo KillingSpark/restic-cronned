@@ -32,7 +32,7 @@ type Job struct {
 	lastSuccess      int64
 	stop             chan bool
 	stopAnswer       chan bool
-	trigger          chan int
+	trigger          chan TriggerType
 	queue            *JobQueue
 	JobNameToTrigger string `json:"NextJob"`
 	JobName          string `json:"JobName"`
@@ -49,7 +49,7 @@ func newJob() *Job {
 		Progress:   0,
 		stop:       make(chan bool),
 		stopAnswer: make(chan bool),
-		trigger:    make(chan int),
+		trigger:    make(chan TriggerType),
 	}
 }
 
@@ -60,6 +60,14 @@ const (
 	returnStop  JobReturn = 0
 	returnOk    JobReturn = 1
 	returnRetry JobReturn = 2
+)
+
+//TriggerType extern triggers only followup jobs but does not retrigger himself
+type TriggerType int
+
+const (
+	triggerIntern TriggerType = 0
+	triggerExtern TriggerType = 1
 )
 
 //JobStatus stati the jobs can be in
@@ -82,9 +90,9 @@ func (job *Job) retrieveAndStorePassword() {
 }
 
 //SendTrigger makes the job  run immediatly (if waiting or immediatly again if working right now)
-func (job *Job) SendTrigger() {
+func (job *Job) SendTrigger(trigType TriggerType) {
 	if job.Status == statusWaiting || job.Status == statusWorking {
-		job.trigger <- 0
+		job.trigger <- trigType
 	}
 }
 
@@ -98,13 +106,13 @@ func (job *Job) SendTriggerWithDelay(dur time.Duration) {
 
 	time.Sleep(dur)
 
-	job.SendTrigger()
+	job.SendTrigger(triggerIntern)
 }
 
 func (job *Job) triggerNextJob() {
-	toTrigger := job.queue.findJob(job.JobNameToTrigger)
+	toTrigger, _ := job.queue.findJob(job.JobNameToTrigger)
 	if toTrigger != nil {
-		toTrigger.SendTrigger()
+		toTrigger.SendTrigger(triggerIntern)
 	}
 }
 

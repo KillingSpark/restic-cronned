@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"path"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -33,7 +34,7 @@ func (queue *JobQueue) WaitForAllJobs() {
 
 //StopJob stops the job with this name
 func (queue *JobQueue) StopJob(name string) error {
-	job := queue.findJob(name)
+	job, _ := queue.findJob(name)
 	if job != nil {
 		job.Stop()
 	} else {
@@ -42,9 +43,30 @@ func (queue *JobQueue) StopJob(name string) error {
 	return nil
 }
 
+func (queue *JobQueue) RemoveJob(name string) error {
+	for idx, job := range queue.Jobs {
+		if job.JobName == name {
+			job.Stop()
+			queue.Jobs = append(queue.Jobs[:idx], queue.Jobs[idx+1:]...)
+			return nil
+		}
+	}
+	return errors.New("No such job")
+}
+
+func (queue *JobQueue) TriggerJob(name string) error {
+	job, _ := queue.findJob(name)
+	if job != nil {
+		job.SendTrigger(triggerExtern)
+	} else {
+		return errors.New("No such Job")
+	}
+	return nil
+}
+
 //RestartJob restarts the job with this name if it is present and in the "stopped" State
 func (queue *JobQueue) RestartJob(name string) error {
-	job := queue.findJob(name)
+	job, _ := queue.findJob(name)
 	if job != nil && job.Status == statusStopped {
 		job.Status = statusReady
 		err := queue.startJob(job)
@@ -67,7 +89,7 @@ func (queue *JobQueue) StopAllJobs() {
 //ReloadJob reloads the file (with all changes made to it) and replaces the old job with the new one.
 //the old job is stopped (and waited for until stopped) before the new job is started
 func (queue *JobQueue) ReloadJob(name string) error {
-	oldJob := queue.findJob(name)
+	oldJob, _ := queue.findJob(name)
 
 	if oldJob == nil {
 		return errors.New("No such job")
@@ -75,7 +97,7 @@ func (queue *JobQueue) ReloadJob(name string) error {
 
 	files, err := ioutil.ReadDir(queue.Directory)
 	if err != nil {
-		log.Fatal("Error opening the directory: " + err.Error())
+		log.Error("Error opening the directory: " + err.Error())
 	}
 
 	for _, f := range files {
@@ -83,7 +105,7 @@ func (queue *JobQueue) ReloadJob(name string) error {
 			continue
 		}
 
-		file, err := os.Open(f.Name())
+		file, err := os.Open(path.Join(queue.Directory, f.Name()))
 		if err != nil {
 			log.WithFields(log.Fields{"File": f.Name(), "Error": err.Error()}).Warning("File error")
 			continue
@@ -95,7 +117,10 @@ func (queue *JobQueue) ReloadJob(name string) error {
 			continue
 		}
 		queue.replaceJob(job, oldJob)
-		queue.RestartJob(job.JobName)
+		err = queue.startJob(job)
+		if err != nil {
+			print(err.Error())
+		}
 		return nil
 	}
 	log.WithFields(log.Fields{"Job": name}).Warning("No file for job")
@@ -103,17 +128,20 @@ func (queue *JobQueue) ReloadJob(name string) error {
 }
 
 func (queue *JobQueue) replaceJob(newJob, oldJob *Job) {
-	oldJob.Stop()
-	*oldJob = *newJob
+	if oldJob.Status != statusWaiting {
+		oldJob.Stop()
+	}
+	_, idx := queue.findJob(oldJob.JobName)
+	queue.Jobs[idx] = newJob
 }
 
-func (queue *JobQueue) findJob(name string) *Job {
-	for _, job := range queue.Jobs {
+func (queue *JobQueue) findJob(name string) (*Job, int) {
+	for idx, job := range queue.Jobs {
 		if job.JobName == name {
-			return job
+			return job, idx
 		}
 	}
-	return nil
+	return nil, 0
 }
 
 func (queue *JobQueue) startJob(job *Job) error {
@@ -127,13 +155,14 @@ func (queue *JobQueue) startJob(job *Job) error {
 
 //JobExists Check if this job is in the queue
 func (queue *JobQueue) JobExists(name string) bool {
-	return queue.findJob(name) != nil
+	job, _ := queue.findJob(name)
+	return job != nil
 }
 
 //AddJobs adds the jobs to its list and starts them
 func (queue *JobQueue) AddJobs(jobs []*Job) {
 	for _, job := range jobs {
-		if oldJob := queue.findJob(job.JobName); oldJob != nil {
+		if oldJob, _ := queue.findJob(job.JobName); oldJob != nil {
 			queue.replaceJob(job, oldJob)
 		} else {
 			queue.Jobs = append(queue.Jobs, job)
