@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=ResticCronned
+Exec=restic-cronned /$HOME/.config/restic-cronned/ ":8080"
+Icon=STOCK_FLOPPY
+Type=Application
+Categories=System;
