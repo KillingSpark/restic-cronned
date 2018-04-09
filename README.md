@@ -13,6 +13,21 @@ Obviously depends on [restic](https://github.com/restic/restic)
 `restic-cronned "/path/to/job/diretory" ":someport"`  
 The port is optional, if not given the server wont be started
   
+The config file resides in $HOME/.config/restic-cronned/config and looks like this:
+```
+{
+    "JobPath": "$HOME/.config/restic-cronned/jobs",
+    "SrvConf": {"Port": ":8080"},
+    "LogConf": {
+        "LogDir": "$HOME/.cache/restic-cronned",
+        "MaxAge": 30,
+        "MaxSize": 10
+    }
+}
+```
+If any of the values are not present in your config they will default to these values.  
+Note that the values for MaxAge are given in Days and MAxSize is in MB. They correspond with the values for https://github.com/bdurand/lumberjack
+
 ## Job definition ##
 A Job is one restic action like backup or forget. It can be triggered periodically by itself or it can be triggered by another Job.  
 A Job can for example backup a folder and then trigger a forget on the same repo. With this approach no lock races should occur.
