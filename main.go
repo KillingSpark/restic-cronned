@@ -51,8 +51,8 @@ func startDaemon(conf config) {
 		port = os.Args[2]
 	}
 
-	println("Path: " + conf.JobPath)
-	println("Port: " + conf.SrvConf.Port)
+	println("Path: " + jobDirPath)
+	println("Port: " + port)
 
 	queue, err := jobs.NewJobQueue(jobDirPath)
 	if err != nil {
