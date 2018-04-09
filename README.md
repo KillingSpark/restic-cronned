@@ -26,7 +26,7 @@ The config file resides in $HOME/.config/restic-cronned/config and looks like th
 }
 ```
 If any of the values are not present in your config they will default to these values.  
-Note that the values for MaxAge are given in Days and MAxSize is in MB. They correspond with the values for https://github.com/bdurand/lumberjack
+Note that the values for MaxAge are given in Days and MAxSize is in MB. They correspond with the values for https://github.com/rshmelev/lumberjack
 
 ## Job definition ##
 A Job is one restic action like backup or forget. It can be triggered periodically by itself or it can be triggered by another Job.  
