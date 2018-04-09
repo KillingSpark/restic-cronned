@@ -26,7 +26,9 @@ The config file resides in $HOME/.config/restic-cronned/config and looks like th
 }
 ```
 If any of the values are not present in your config they will default to these values.  
-Note that the values for MaxAge are given in Days and MAxSize is in MB. They correspond with the values for https://github.com/rshmelev/lumberjack
+Note that the values for MaxAge are given in Days and MAxSize is in MB. They correspond with the values for https://github.com/rshmelev/lumberjack  
+Note also that the path and port on the commandline take precedence over the config file.  
+
 
 ## Job definition ##
 A Job is one restic action like backup or forget. It can be triggered periodically by itself or it can be triggered by another Job.  
@@ -99,10 +101,10 @@ Exposes commands as:
 * `/restart?name=JOBNAME`
 * `/reload?name=JOBNAME` <-- requires the file to be named `JOBNAME.json`
 
-You can use the rccommand tool to do these for you if you dont wnat to use curl
+You can use the rccommand tool to do these for you if you dont want to use curl
 
 # Future plans #
-1. Better configuration maybe using viper/cobra/...
-1. Improve lock watching for repos. Right now there are still race conditions. Every job can still fail once for every race he looses.
-1. better output for/from the command-wrapper tool
+1. Better configuration maybe using viper/cobra/... (right now just loading a config json file. Works well enough though)
+1. Improve lock watching for repos. Right now there are still race conditions if two jobs are working on the same repo. But one can use the triggers to avoid these.
+1. Better output for/from the command-wrapper tool
 
