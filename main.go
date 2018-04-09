@@ -8,6 +8,7 @@ import (
 	"github.com/KillingSpark/restic-cronned/jobs"
 	"github.com/KillingSpark/restic-cronned/output"
 	log "github.com/Sirupsen/logrus"
+	"github.com/rshmelev/lumberjack"
 )
 
 type serverConfig struct {
@@ -15,8 +16,8 @@ type serverConfig struct {
 }
 
 type loggingConfig struct {
-	MaxSize int64  `json:"MaxSize"`
-	MaxAge  int64  `json:"MaxAge"`
+	MaxSize int    `json:"MaxSize"`
+	MaxAge  int    `json:"MaxAge"`
 	LogDir  string `json:"LogDir"`
 }
 
@@ -26,18 +27,15 @@ type config struct {
 	LogConf loggingConfig `json:"LogConf"`
 }
 
-func setupLogging(conf loggingConfig) error {
+func setupLogging(conf loggingConfig) {
 	log.SetFormatter(&log.TextFormatter{})
 	logpath := os.ExpandEnv(conf.LogDir)
 	os.MkdirAll(logpath, 0700) //readwrite for user only
-	logfile, err := os.OpenFile(path.Join(logpath, "restic-cronned.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err == nil {
-		log.SetOutput(logfile)
-	} else {
-		log.SetOutput(os.Stdout)
-		return err
-	}
-	return nil
+	log.SetOutput(&lumberjack.Logger{
+		Filename: path.Join(logpath, "restic-cronned.log"),
+		MaxSize:  conf.MaxSize, // megabytes
+		MaxAge:   conf.MaxAge,  //days
+	})
 }
 
 func startDaemon(conf config) {
@@ -97,10 +95,6 @@ func loadConfig() config {
 
 func main() {
 	conf := loadConfig()
-	err := setupLogging(conf.LogConf)
-	if err != nil {
-		println(err.Error())
-		return
-	}
+	setupLogging(conf.LogConf)
 	startDaemon(conf)
 }
