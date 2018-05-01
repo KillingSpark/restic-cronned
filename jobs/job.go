@@ -3,9 +3,11 @@ package jobs
 //Job a job to be run periodically
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"syscall"
@@ -157,8 +159,41 @@ func (job *Job) loop(finishCallback func()) {
 func (job *Job) start(store JobStore, finishCallback func()) {
 	job.jobstore = store
 	job.lastSuccess = time.Now().UnixNano()
-	go job.SendTriggerWithDelay(job.RegularTimer)
+	go job.SendTriggerWithDelay(job.findInitialTriggerTime())
 	go job.loop(finishCallback)
+}
+
+var jobTriggerPersistDir = path.Join(os.ExpandEnv("$HOME"), ".local/share/restic-cronned")
+
+type persistedJobTrigger struct {
+	LastTrigger time.Time
+}
+
+func (job *Job) findInitialTriggerTime() time.Duration {
+	os.MkdirAll(jobTriggerPersistDir, 0700)
+	path := path.Join(jobTriggerPersistDir, job.JobName)
+	_, err := os.Stat(path)
+	if err != nil {
+		//file doesnt exist -> regular start
+		return job.RegularTimer
+	}
+	var persTrigg persistedJobTrigger
+	file, err := os.Open(path)
+	if err != nil {
+		//error opening... regular start is probably sensible?
+		return job.RegularTimer
+	}
+	err = json.NewDecoder(file).Decode(&persTrigg)
+	if err != nil {
+		//error decoding... regular start is probably sensible?
+		return job.RegularTimer
+	}
+	restTimer := job.RegularTimer - time.Since(persTrigg.LastTrigger)
+	print(restTimer / time.Second)
+	if restTimer < 0 {
+		restTimer = 0
+	}
+	return restTimer
 }
 
 func (job *Job) retry() {
@@ -174,8 +209,23 @@ func (job *Job) success(retrigger bool) {
 		if job.RegularTimer > 0 {
 			timeTaken := time.Duration(time.Now().UnixNano()-job.lastSuccess) - job.RegularTimer
 			job.lastSuccess = time.Now().UnixNano()
-			toWait := job.RegularTimer - timeTaken
+			toWait := job.RegularTimer
+			if timeTaken > 0 {
+				toWait -= timeTaken
+			}
 			go job.SendTriggerWithDelay(toWait)
+
+			persTrig := persistedJobTrigger{LastTrigger: time.Now().Add(time.Duration(-timeTaken))}
+			path := path.Join(jobTriggerPersistDir, job.JobName)
+			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
+			if err != nil {
+				//error opening... whatever
+			} else {
+				err = json.NewEncoder(file).Encode(persTrig)
+				if err != nil {
+					//error encoding... shouldnt happen
+				}
+			}
 		}
 	}
 

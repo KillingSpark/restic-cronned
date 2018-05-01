@@ -83,6 +83,9 @@ ExampleForget.json
 }
 ```
 
+Jobs save their last successful run time in a file in $HOME/.local/share/restic-cronned/<Jobname>. If this file exists when the Job gets started it 
+calculates his initial trigger time accordingly so the jobs run somewhat regularly if the system/the queue is restarted
+
 ## Passwords ##
 For convenience (and to be sure the keys can be read correctly from the keyring) the rckeyutil can be used to set/get/delete the repo keys.  
 Usage:
