@@ -94,19 +94,37 @@ func (job *Job) retrieveAndStorePassword() {
 //SendTrigger makes the job  run immediatly (if waiting or immediatly again if working right now)
 func (job *Job) SendTrigger(trigType TriggerType) {
 	if job.Status == statusWaiting || job.Status == statusWorking {
+		println(job.JobName + ": start send trig")
 		job.trigger <- trigType
+		println(job.JobName + ": sent trig")
 	}
 }
 
 //SendTriggerWithDelay makes the job run after "dur" nanoseconds
 func (job *Job) SendTriggerWithDelay(dur time.Duration) {
+	print(job.JobName + ": scheduled trigger: ")
+	println(dur)
 	if dur < 0 {
 		return
 	}
-	job.WaitStart = time.Duration(time.Now().UnixNano())
-	job.WaitEnd = job.WaitStart + dur
+	if dur > 0 {
+		job.WaitStart = time.Duration(time.Now().UnixNano())
+		job.WaitEnd = job.WaitStart + dur
 
-	time.Sleep(dur)
+		persTrig := persistedJobTrigger{NextTrigger: time.Now().Add(dur)}
+		path := path.Join(jobTriggerPersistDir, job.JobName)
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
+		if err != nil {
+			//error opening... whatever
+		} else {
+			err = json.NewEncoder(file).Encode(persTrig)
+			if err != nil {
+				//error encoding... shouldnt happen
+			}
+		}
+
+		time.Sleep(dur)
+	}
 
 	job.SendTrigger(triggerIntern)
 }
@@ -120,11 +138,12 @@ func (job *Job) triggerNextJob() {
 
 func (job *Job) loop(finishCallback func()) {
 	defer job.finish(finishCallback)
-	job.Status = statusWaiting
 	for {
 		var retrigger = false
+		println(job.JobName + ": wait for trigger")
 		select {
 		case trigType := <-job.trigger:
+			println(job.JobName + ": got trigger")
 			switch trigType {
 			case triggerIntern:
 				retrigger = true
@@ -159,37 +178,48 @@ func (job *Job) loop(finishCallback func()) {
 func (job *Job) start(store JobStore, finishCallback func()) {
 	job.jobstore = store
 	job.lastSuccess = time.Now().UnixNano()
-	go job.SendTriggerWithDelay(job.findInitialTriggerTime())
+	job.Status = statusWaiting
 	go job.loop(finishCallback)
+	go job.SendTriggerWithDelay(job.findInitialTriggerTime())
 }
 
 var jobTriggerPersistDir = path.Join(os.ExpandEnv("$HOME"), ".local/share/restic-cronned")
 
 type persistedJobTrigger struct {
-	LastTrigger time.Time
+	NextTrigger time.Time
 }
 
 func (job *Job) findInitialTriggerTime() time.Duration {
+	if job.RegularTimer < 0 {
+		return job.RegularTimer
+	}
+
 	os.MkdirAll(jobTriggerPersistDir, 0700)
 	path := path.Join(jobTriggerPersistDir, job.JobName)
 	_, err := os.Stat(path)
 	if err != nil {
-		//file doesnt exist -> regular start
-		return job.RegularTimer
+		//file doesnt exist -> start directly
+		return 0
 	}
+
 	var persTrigg persistedJobTrigger
 	file, err := os.Open(path)
 	if err != nil {
 		//error opening... regular start is probably sensible?
+		//and remove file so that a correct one can be written
+		os.Remove(path)
 		return job.RegularTimer
 	}
 	err = json.NewDecoder(file).Decode(&persTrigg)
 	if err != nil {
 		//error decoding... regular start is probably sensible?
+		//and remove file so that a correct one can be written
+		os.Remove(path)
 		return job.RegularTimer
 	}
-	restTimer := job.RegularTimer - time.Since(persTrigg.LastTrigger)
-	print(restTimer / time.Second)
+	restTimer := -time.Since(persTrigg.NextTrigger)
+	print("file found resttime: ")
+	println(restTimer / time.Second)
 	if restTimer < 0 {
 		restTimer = 0
 	}
@@ -210,22 +240,10 @@ func (job *Job) success(retrigger bool) {
 			timeTaken := time.Duration(time.Now().UnixNano()-job.lastSuccess) - job.RegularTimer
 			job.lastSuccess = time.Now().UnixNano()
 			toWait := job.RegularTimer
-			if timeTaken > 0 {
+			if timeTaken > 0 && timeTaken <= toWait {
 				toWait -= timeTaken
 			}
 			go job.SendTriggerWithDelay(toWait)
-
-			persTrig := persistedJobTrigger{LastTrigger: time.Now().Add(time.Duration(-timeTaken))}
-			path := path.Join(jobTriggerPersistDir, job.JobName)
-			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
-			if err != nil {
-				//error opening... whatever
-			} else {
-				err = json.NewEncoder(file).Encode(persTrig)
-				if err != nil {
-					//error encoding... shouldnt happen
-				}
-			}
 		}
 	}
 
