@@ -86,6 +86,14 @@ ExampleForget.json
 Jobs save their last successful run time in a file in $HOME/.local/share/restic-cronned/<Jobname>. If this file exists when the Job gets started it 
 calculates his initial trigger time accordingly so the jobs run somewhat regularly if the system/the queue is restarted
 
+## Restarts/Suspends/Crashes ##
+Whenever a job schedules a trigger a file is written: "$HOME/.local/shar/restic-cronned/JOBNAME" this contains a timestamp when the job should be triggered. When a job is started it looks for this file.  
+* If it does not exist the job gets triggered right away (new jobs for example!).  
+* If it does exist but is not readable/decodable the job will wait its regular time for the next trigger (which will be written into this file)  
+* If it does exist and the timestamp is still in the future it will wait the time left until this timestamp.
+* If it does exist and the timestamo is in the past the job will be triggered right away. Until now the job will then wait its regular timer. That can shift your cycle. Plans to fix this exist.   
+
+
 ## Passwords ##
 For convenience (and to be sure the keys can be read correctly from the keyring) the rckeyutil can be used to set/get/delete the repo keys.  
 Usage:
@@ -105,6 +113,8 @@ Exposes commands as:
 * `/reload?name=JOBNAME` <-- requires the file to be named `JOBNAME.json`
 
 You can use the rccommand tool to do these for you if you dont want to use curl
+* rccommands COMMAND JOBNAME
+Translates into ```/COMMAND?name=JOBNAME```. If no name is needed it is ignored if given. 
 
 # Future plans #
 1. Better configuration maybe using viper/cobra/... (right now just loading a config json file. Works well enough though)

@@ -23,19 +23,29 @@ var (
 
 //Job represents one job that will be run in a Queue
 type Job struct {
-	RegularTimer     time.Duration `json:"regularTimer"`
-	RetryTimer       time.Duration `json:"retryTimer"`
-	CurrentRetry     int           `json:"CurrentRetry"`
-	MaxFailedRetries int           `json:"maxFailedRetries"`
-	Status           JobStatus     `json:"status"`
-	Progress         float64       `json:"progress"`
-	WaitStart        time.Duration `json:"WaitStart"`
-	WaitEnd          time.Duration `json:"WaitEnd"`
-	lastSuccess      int64
-	stop             chan bool
-	stopAnswer       chan bool
-	trigger          chan TriggerType
-	jobstore         JobStore
+	//timers that get waited
+	RegularTimer time.Duration `json:"regularTimer"`
+	RetryTimer   time.Duration `json:"retryTimer"`
+	//Retry counter/limit
+	CurrentRetry     int `json:"CurrentRetry"`
+	MaxFailedRetries int `json:"maxFailedRetries"`
+	//statemachine status
+	Status JobStatus `json:"status"`
+	//the progress of the running restic command. not working.
+	Progress float64 `json:"progress"`
+	//times set when the wait is started
+	WaitStart time.Duration `json:"WaitStart"`
+	WaitEnd   time.Duration `json:"WaitEnd"`
+	//timepoint in unixnanos where the job was last succesfull
+	lastSuccess int64
+	//channels used for stopping the loop/answering to the caller
+	stop       chan bool
+	stopAnswer chan bool
+	//channel to trigger the loop to run once
+	trigger chan TriggerType
+	//interface to the queue that lats you query for jobs. used for triggerNext
+	jobstore JobStore
+	//generic data from the config files
 	JobNameToTrigger string `json:"NextJob"`
 	JobName          string `json:"JobName"`
 	Username         string `json:"Username"`
@@ -87,6 +97,7 @@ func (job *Job) retrieveAndStorePassword() {
 	if err != nil {
 		log.WithFields(log.Fields{"Job": job.JobName}).Warning("couldn't retrieve password.")
 	} else {
+		log.WithFields(log.Fields{"Job": job.JobName}).Warning("retrieved password.")
 		job.password = key
 	}
 }
@@ -94,38 +105,39 @@ func (job *Job) retrieveAndStorePassword() {
 //SendTrigger makes the job  run immediatly (if waiting or immediatly again if working right now)
 func (job *Job) SendTrigger(trigType TriggerType) {
 	if job.Status == statusWaiting || job.Status == statusWorking {
-		println(job.JobName + ": start send trig")
+		log.WithFields(log.Fields{"Job": job.JobName}).Info("Trigger try")
 		job.trigger <- trigType
-		println(job.JobName + ": sent trig")
 	}
 }
 
 //SendTriggerWithDelay makes the job run after "dur" nanoseconds
 func (job *Job) SendTriggerWithDelay(dur time.Duration) {
-	print(job.JobName + ": scheduled trigger: ")
-	println(dur)
 	if dur < 0 {
+		//ignore for example jobs that shouldnt be run
 		return
 	}
 	if dur > 0 {
+		//for frontends
 		job.WaitStart = time.Duration(time.Now().UnixNano())
 		job.WaitEnd = job.WaitStart + dur
 
+		//create persited trigger for the end of this wait. If the queue stops or the pc restarts this will be picked up and handled with best effort.
 		persTrig := persistedJobTrigger{NextTrigger: time.Now().Add(dur)}
 		path := path.Join(jobTriggerPersistDir, job.JobName)
 		file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
-			//error opening... whatever
+			log.WithFields(log.Fields{"Job": job.JobName}).Warning("could not open file for persisted trigger")
 		} else {
 			err = json.NewEncoder(file).Encode(persTrig)
 			if err != nil {
-				//error encoding... shouldnt happen
+				log.WithFields(log.Fields{"Job": job.JobName}).Warning("could not encode persisted trigger")
+			} else {
+				log.WithFields(log.Fields{"Job": job.JobName}).Info("Trigger persisted")
 			}
 		}
-
+		log.WithFields(log.Fields{"Job": job.JobName}).Info("Trigger scheduled")
 		time.Sleep(dur)
 	}
-
 	job.SendTrigger(triggerIntern)
 }
 
@@ -133,6 +145,8 @@ func (job *Job) triggerNextJob() {
 	toTrigger, _ := job.jobstore.FindJob(job.JobNameToTrigger)
 	if toTrigger != nil {
 		toTrigger.SendTrigger(triggerIntern)
+	} else {
+		log.WithFields(log.Fields{"Job": job.JobName}).Warning("could not find nextToTrigger Job")
 	}
 }
 
@@ -140,10 +154,11 @@ func (job *Job) loop(finishCallback func()) {
 	defer job.finish(finishCallback)
 	for {
 		var retrigger = false
-		println(job.JobName + ": wait for trigger")
+		job.Status = statusWaiting
+		log.WithFields(log.Fields{"Job": job.JobName}).Info("Await trigger/stop")
 		select {
 		case trigType := <-job.trigger:
-			println(job.JobName + ": got trigger")
+			log.WithFields(log.Fields{"Job": job.JobName}).Info("Trigger received")
 			switch trigType {
 			case triggerIntern:
 				retrigger = true
@@ -178,8 +193,8 @@ func (job *Job) loop(finishCallback func()) {
 func (job *Job) start(store JobStore, finishCallback func()) {
 	job.jobstore = store
 	job.lastSuccess = time.Now().UnixNano()
-	job.Status = statusWaiting
 	go job.loop(finishCallback)
+	job.Status = statusWaiting
 	go job.SendTriggerWithDelay(job.findInitialTriggerTime())
 }
 
@@ -198,28 +213,25 @@ func (job *Job) findInitialTriggerTime() time.Duration {
 	path := path.Join(jobTriggerPersistDir, job.JobName)
 	_, err := os.Stat(path)
 	if err != nil {
-		//file doesnt exist -> start directly
+		log.WithFields(log.Fields{"Job": job.JobName}).Info("No persisted trigger found")
 		return 0
 	}
 
 	var persTrigg persistedJobTrigger
 	file, err := os.Open(path)
 	if err != nil {
-		//error opening... regular start is probably sensible?
-		//and remove file so that a correct one can be written
+		log.WithFields(log.Fields{"Job": job.JobName}).Warn("Error opening the persisted trigger")
 		os.Remove(path)
 		return job.RegularTimer
 	}
 	err = json.NewDecoder(file).Decode(&persTrigg)
 	if err != nil {
-		//error decoding... regular start is probably sensible?
-		//and remove file so that a correct one can be written
+		log.WithFields(log.Fields{"Job": job.JobName}).Warn("Error decoding the persisted trigger")
 		os.Remove(path)
 		return job.RegularTimer
 	}
 	restTimer := -time.Since(persTrigg.NextTrigger)
-	print("file found resttime: ")
-	println(restTimer / time.Second)
+	log.WithFields(log.Fields{"Job": job.JobName, "Timer": restTimer}).Info("Persisted timer found")
 	if restTimer < 0 {
 		restTimer = 0
 	}
@@ -227,6 +239,7 @@ func (job *Job) findInitialTriggerTime() time.Duration {
 }
 
 func (job *Job) retry() {
+	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Info("Start next retry")
 	job.CurrentRetry++
 	go job.SendTriggerWithDelay(job.RetryTimer)
 }
@@ -290,6 +303,7 @@ func (job *Job) updateStatus(stdout io.ReadCloser) {
 		n, err = stdout.Read(buf)
 	}
 }
+
 func (job *Job) getRepo() string {
 	var repo string
 	for idx, arg := range job.ResticArguments {
@@ -320,7 +334,9 @@ func (job *Job) run() JobReturn {
 	//if err == nil {
 	//	go job.updateStatus(stdout)
 	//}
+	log.WithFields(log.Fields{"Job": job.JobName}).Info("Run restic")
 	err := cmd.Run()
+	log.WithFields(log.Fields{"Job": job.JobName}).Info("Finished running restic")
 
 	var exitCode = 0
 
