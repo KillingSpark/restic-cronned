@@ -97,7 +97,7 @@ func (job *Job) retrieveAndStorePassword() {
 	if err != nil {
 		log.WithFields(log.Fields{"Job": job.JobName}).Warning("couldn't retrieve password.")
 	} else {
-		log.WithFields(log.Fields{"Job": job.JobName}).Warning("retrieved password.")
+		log.WithFields(log.Fields{"Job": job.JobName}).Info("retrieved password.")
 		job.password = key
 	}
 }
@@ -135,18 +135,22 @@ func (job *Job) SendTriggerWithDelay(dur time.Duration) {
 				log.WithFields(log.Fields{"Job": job.JobName}).Info("Trigger persisted")
 			}
 		}
-		log.WithFields(log.Fields{"Job": job.JobName}).Info("Trigger scheduled")
+		log.WithFields(log.Fields{"Job": job.JobName, "TimeStamp": persTrig.NextTrigger}).Info("Trigger scheduled")
 		time.Sleep(dur)
 	}
 	job.SendTrigger(triggerIntern)
 }
 
 func (job *Job) triggerNextJob() {
+	if len(job.JobNameToTrigger) <= 0 {
+		log.WithFields(log.Fields{"Job": job.JobName}).Info("No follow up job")
+		return
+	}
 	toTrigger, _ := job.jobstore.FindJob(job.JobNameToTrigger)
 	if toTrigger != nil {
 		toTrigger.SendTrigger(triggerIntern)
 	} else {
-		log.WithFields(log.Fields{"Job": job.JobName}).Warning("could not find nextToTrigger Job")
+		log.WithFields(log.Fields{"Job": job.JobName, "NextJob": job.JobNameToTrigger}).Warning("could not find next Job")
 	}
 }
 
