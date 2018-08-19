@@ -136,7 +136,10 @@ func (job *Job) SendTriggerWithDelay(dur time.Duration) {
 			}
 		}
 		log.WithFields(log.Fields{"Job": job.JobName, "TimeStamp": persTrig.NextTrigger}).Info("Trigger scheduled")
-		time.Sleep(dur)
+
+		for time.Now().Round(0).Before(persTrig.NextTrigger.Round(0)) {
+			time.Sleep(1 * time.Millisecond)
+		}
 	}
 	job.SendTrigger(triggerIntern)
 }
