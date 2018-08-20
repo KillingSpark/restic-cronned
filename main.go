@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path"
 
 	"github.com/KillingSpark/restic-cronned/jobs"
 	"github.com/KillingSpark/restic-cronned/output"
 	log "github.com/Sirupsen/logrus"
+	"github.com/rshmelev/lumberjack"
 )
 
 type serverConfig struct {
@@ -29,11 +31,11 @@ func setupLogging(conf loggingConfig) {
 	log.SetFormatter(&log.TextFormatter{})
 	logpath := os.ExpandEnv(conf.LogDir)
 	os.MkdirAll(logpath, 0700) //readwrite for user only
-	//log.SetOutput(&lumberjack.Logger{
-	//	Filename: path.Join(logpath, "restic-cronned.log"),
-	//	MaxSize:  conf.MaxSize, // megabytes
-	//	MaxAge:   conf.MaxAge,  //days
-	//})
+	log.SetOutput(&lumberjack.Logger{
+		Filename: path.Join(logpath, "restic-cronned.log"),
+		MaxSize:  conf.MaxSize, // megabytes
+		MaxAge:   conf.MaxAge,  //days
+	})
 }
 
 func startDaemon(conf config) {
