@@ -45,12 +45,22 @@ These files need to be in a directory, that is specified by the first command li
     "NextJob"           string,         //Identifies the Job that should be triggered after this one
     "Username":         string,         //Username that was used to put the restic-repo password into the keyring
     "Service":          string,         //Service that was used to put the restic-repo password into the keyring
-    "ResticPath":       string          //Optional path to the executable of restic (maybe different versions for different repos, not in PATH...)
-    "ResticArguments":  [string]        //all arguments for restic   
+    "ResticPath":       string,          //Optional path to the executable of restic (maybe different versions for different repos, not in PATH...)
+    "ResticArguments":  [string],        //all arguments for restic
+
+    "Preconditions":
+    {
+        "PathesMust": [string],          //Pathes that must be present and not empty for the job to run (e.g. the mount point of an nfs)
+        "HostsMustRoute": [string],      //Hosts that must be routable for the job to run (e.g. the host of an nfs or a sftp server)
+        "HostsMustConnect":              //Hosts that must be connectable with tcp on the specified port
+        [
+            {"Host": string, "Port": int}
+        ],
+    },   
 }
 ```
 
-This example backups /var/www/my-site daily.  
+This example backups /var/www/my-site daily to a nfs (served by the server mynfshost) mounted on /tmp/backup
 If the backup failed (maybe for connectivity issues or whatever) it retries 3 times hourly  
 It also forgets about the old snapshots and keeps the last 30 (about a month) by triggering forget from the Backup 
 
@@ -59,12 +69,17 @@ ExmapleBackup.json
 {
     "regularTimer": 86400,
     "retryTimer": 3600,
-    "maxFailedRetries": 3,
+    "maxFailedRetries": 2,
     "JobName": "ExampleBackup",
     "NextJob": "ExampleForget",
     "Username":"Apache",
     "Service": "restic-repo1",
-    "ResticArguments": ["-r", "/tmp/backup", "backup", "/var/www/my-site"]
+    "ResticArguments": ["-r", "/tmp/backup", "backup", "/var/www/my-site"],
+    "Preconditions": {
+        "HostsMustRoute": ["mynfshost"],
+        "PathesMust": ["/tmp/backup"],
+        "HostsMustConnect": [{"Host": "google.com", "Port": 80}]
+    }
 }
 ```
   

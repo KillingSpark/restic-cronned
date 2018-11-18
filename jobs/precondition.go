@@ -15,36 +15,28 @@ type JobPreconditions struct {
 }
 
 func (jp *JobPreconditions) CheckAll() bool {
-	res := make(chan bool)
+	allGood := true
 	for _, pm := range jp.PathesMust {
-		go func() { res <- pm.CheckCondition() }()
+		allGood = allGood && pm.CheckCondition()
 	}
 	for _, hmr := range jp.HostsMustRoute {
-		go func() { res <- hmr.CheckCondition() }()
+		allGood = allGood && hmr.CheckCondition()
 	}
 	for _, hmc := range jp.HostsMustConnect {
-		go func() { res <- hmc.CheckCondition() }()
-	}
-
-	allGood := true
-
-	for i := 0; i < len(jp.HostsMustConnect)+len(jp.HostsMustRoute)+len(jp.PathesMust); i++ {
-		allGood = allGood && <-res
+		allGood = allGood && hmc.CheckCondition()
 	}
 	return allGood
 }
 
-type PathPrecond struct {
-	Path string `json:"Path"`
-}
+type PathPrecond string
 
 func (pp *PathPrecond) CheckCondition() bool {
-	stat, err := os.Stat(pp.Path)
+	stat, err := os.Stat(string(*pp))
 	if err != nil {
 		return false
 	}
 	if stat.IsDir() {
-		list, err := ioutil.ReadDir(path.Join(pp.Path))
+		list, err := ioutil.ReadDir(path.Join(string(*pp)))
 		if err != nil {
 			return false
 		}
@@ -56,12 +48,10 @@ func (pp *PathPrecond) CheckCondition() bool {
 	return false
 }
 
-type HostRoutePrecond struct {
-	Host string `json:"Host"`
-}
+type HostRoutePrecond string
 
 func (hrp *HostRoutePrecond) CheckCondition() bool {
-	_, err := net.LookupIP(hrp.Host)
+	_, err := net.LookupIP(string(*hrp))
 	if err != nil {
 		return false
 	}
