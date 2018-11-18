@@ -63,9 +63,16 @@ These files need to be in a directory, that is specified by the first command li
 }
 ```
 
+### Preconditions ###
+Preconditions are checks that are performed before the actual restic command is executed. Especially network availability is an important precondition for users that suspend their system. It is very possible that a job would wake up and try to backup while the network isnt up yet. That would delay the 
+job execution unecessarly until the next retry timer.
+
+Retry timer exist for actual failures(maybe other processes lock the repo, the connection dropped in the middle,...)
+
+### Example ###
 This example backups /var/www/my-site at 02:00am to a nfs (served by the server mynfshost) mounted on /tmp/backup.  
 If the backup failed (maybe for connectivity issues or whatever) it retries hourly, 3 times total.  
-It also forgets about the old snapshots and keeps the last 30 (about a month) by triggering forget from the Backup.  
+It also forgets about the old snapshots and keeps the last 30 (about a month) by triggering a ForgetJob from the BackupJob.  
 
 ExmapleBackup.json
 ```
@@ -104,7 +111,7 @@ ExampleForget.json
 ```
 
 ## Restarts/Suspends/Crashes ##
-When a job get scheduled it calculates the time when it should wake up. Then it sleeps for 10 seconds and checks against this time, until the limit is reached. This way restarts/suspends/chrashes should not bother the job too much. Jobs that should have been run when the system was suspended will be run (almost) immediatly when it gets unsuspended
+When a job gets scheduled it calculates the time when it should wake up. Then it sleeps for 10 seconds and checks against this time, until the limit is reached. This way restarts/suspends/chrashes should not bother the jobs too much. Jobs that should have been run when the system was suspended will be run (almost) immediatly when it becomes unsuspended.
 
 ## Passwords ##
 For convenience (and to be sure the keys can be read correctly from the keyring) the rckeyutil should be used to set/get/delete the repo keys.  
@@ -113,7 +120,7 @@ Usage:
 * `rckeyutil del Service Username`
 * `rckeyutil get Service Username`
 
-Example with reference to the example jobs: `rckeyutil set restic-repo1 Apache 1234`
+Example: Set a password '1234' with reference to the example jobs: `rckeyutil set restic-repo1 Apache 1234`
 
 ## Http server ##
 Started only if a port is given as the second command line argument  
