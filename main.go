@@ -39,7 +39,6 @@ func setupLogging(conf loggingConfig) {
 }
 
 func startDaemon(conf config) {
-
 	var jobDirPath = os.ExpandEnv(conf.JobPath)
 	var port = conf.SrvConf.Port
 

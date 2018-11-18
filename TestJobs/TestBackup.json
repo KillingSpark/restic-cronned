@@ -1,0 +1,15 @@
+{
+    "regularTimer": "@every 4s",
+    "retryTimer": "@every 1s",
+    "maxFailedRetries": 2,
+    "JobName": "TestBackup",
+    "NextJob": "TestForget",
+    "Username":"testuser",
+    "Service": "test",
+    "ResticArguments": ["-r", "./testrepo", "backup", "./TestJobs"],
+    "Preconditions": {
+        "HostsMustRoute": ["localhost"],
+        "PathesMust": ["./testrepo"],
+        "HostsMustConnect": [{"Host": "google.com", "Port": 80}]
+    }
+}

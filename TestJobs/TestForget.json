@@ -1,0 +1,8 @@
+{
+    "retryTimer": "@every 3m",
+    "maxFailedRetries": 3,
+    "JobName": "TestForget",
+    "Username":"testuser",
+    "Service": "test",
+    "ResticArguments": ["-r", "./testrepo", "forget", "--keep-last", "30"]
+}

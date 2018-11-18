@@ -3,7 +3,6 @@ package jobs
 //Job a job to be run periodically
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
@@ -14,14 +13,17 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/robfig/cron"
 	keyring "github.com/zalando/go-keyring"
 )
 
 //Job represents one job that will be run in a Queue
 type Job struct {
 	//timers that get waited
-	RegularTimer time.Duration `json:"regularTimer"`
-	RetryTimer   time.Duration `json:"retryTimer"`
+	RegularTimer       string `json:"regularTimer"`
+	regTimerSchedule   cron.Schedule
+	RetryTimer         string `json:"retryTimer"`
+	retryTimerSchedule cron.Schedule
 	//Retry counter/limit
 	CurrentRetry     int `json:"CurrentRetry"`
 	MaxFailedRetries int `json:"maxFailedRetries"`
@@ -32,8 +34,7 @@ type Job struct {
 	//times set when the wait is started
 	WaitStart time.Duration `json:"WaitStart"`
 	WaitEnd   time.Duration `json:"WaitEnd"`
-	//timepoint in unixnanos where the job was last succesfull
-	lastSuccess int64
+
 	//channels used for stopping the loop/answering to the caller
 	stop       chan bool
 	stopAnswer chan bool
@@ -113,6 +114,7 @@ func (job *Job) SendTrigger(trigType TriggerType) {
 func (job *Job) SendTriggerWithDelay(dur time.Duration) {
 	if dur < 0 {
 		//ignore for example jobs that shouldnt be run
+		log.WithFields(log.Fields{"Job": job.JobName, "Duration": dur}).Info("Ignore trigger with negative duration")
 		return
 	}
 	if dur > 0 {
@@ -120,23 +122,11 @@ func (job *Job) SendTriggerWithDelay(dur time.Duration) {
 		job.WaitStart = time.Duration(time.Now().UnixNano())
 		job.WaitEnd = job.WaitStart + dur
 
-		//create persited trigger for the end of this wait. If the queue stops or the pc restarts this will be picked up and handled with best effort.
-		persTrig := persistedJobTrigger{NextTrigger: time.Now().Add(dur)}
-		path := path.Join(jobTriggerPersistDir, job.JobName)
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
-		if err != nil {
-			log.WithFields(log.Fields{"Job": job.JobName}).Warning("could not open file for persisted trigger")
-		} else {
-			err = json.NewEncoder(file).Encode(persTrig)
-			if err != nil {
-				log.WithFields(log.Fields{"Job": job.JobName}).Warning("could not encode persisted trigger")
-			} else {
-				log.WithFields(log.Fields{"Job": job.JobName}).Info("Trigger persisted")
-			}
-		}
-		log.WithFields(log.Fields{"Job": job.JobName, "TimeStamp": persTrig.NextTrigger}).Info("Trigger scheduled")
+		sleepUntil := time.Now().Add(dur).Round(0)
 
-		for time.Now().Round(0).Before(persTrig.NextTrigger.Round(0)) {
+		log.WithFields(log.Fields{"Job": job.JobName, "Time": sleepUntil.String()}).Info("Trigger scheduled")
+
+		for time.Now().Round(0).Before(sleepUntil) {
 			time.Sleep(10 * time.Second)
 		}
 	}
@@ -176,7 +166,7 @@ func (job *Job) loop(finishCallback func()) {
 			return
 		}
 
-		preconds := false
+		preconds := true
 		for i := 0; !preconds && i < job.CheckPrecondsMaxTimes; i++ {
 			preconds = job.Preconditions.CheckAll()
 			if !preconds {
@@ -209,10 +199,9 @@ func (job *Job) loop(finishCallback func()) {
 
 func (job *Job) start(store JobStore, finishCallback func()) {
 	job.jobstore = store
-	job.lastSuccess = time.Now().UnixNano()
 	go job.loop(finishCallback)
 	job.Status = statusWaiting
-	go job.SendTriggerWithDelay(job.findInitialTriggerTime())
+	go job.SendTriggerWithDelay(job.durationTillNextRegularTrigger())
 }
 
 var jobTriggerPersistDir = path.Join(os.ExpandEnv("$HOME"), ".local/share/restic-cronned")
@@ -221,44 +210,28 @@ type persistedJobTrigger struct {
 	NextTrigger time.Time
 }
 
-func (job *Job) findInitialTriggerTime() time.Duration {
-	if job.RegularTimer < 0 {
-		return job.RegularTimer
-	}
+func (job *Job) durationTillNextRegularTrigger() time.Duration {
+	dur := time.Duration(-1)
 
-	os.MkdirAll(jobTriggerPersistDir, 0700)
-	path := path.Join(jobTriggerPersistDir, job.JobName)
-	_, err := os.Stat(path)
-	if err != nil {
-		log.WithFields(log.Fields{"Job": job.JobName}).Info("No persisted trigger found")
-		return 0
+	if job.regTimerSchedule != nil {
+		dur = job.regTimerSchedule.Next(time.Now()).Sub(time.Now())
 	}
+	return dur
+}
 
-	var persTrigg persistedJobTrigger
-	file, err := os.Open(path)
-	if err != nil {
-		log.WithFields(log.Fields{"Job": job.JobName}).Warn("Error opening the persisted trigger")
-		os.Remove(path)
-		return job.RegularTimer
+func (job *Job) durationTillNextRetryTrigger() time.Duration {
+	dur := time.Duration(-1)
+
+	if job.retryTimerSchedule != nil {
+		dur = job.retryTimerSchedule.Next(time.Now()).Sub(time.Now())
 	}
-	err = json.NewDecoder(file).Decode(&persTrigg)
-	if err != nil {
-		log.WithFields(log.Fields{"Job": job.JobName}).Warn("Error decoding the persisted trigger")
-		os.Remove(path)
-		return job.RegularTimer
-	}
-	restTimer := -time.Since(persTrigg.NextTrigger)
-	log.WithFields(log.Fields{"Job": job.JobName, "Timer": restTimer}).Info("Persisted timer found")
-	if restTimer < 0 {
-		restTimer = 0
-	}
-	return restTimer
+	return dur
 }
 
 func (job *Job) retry() {
 	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Info("Start next retry")
 	job.CurrentRetry++
-	go job.SendTriggerWithDelay(job.RetryTimer)
+	go job.SendTriggerWithDelay(job.durationTillNextRetryTrigger())
 }
 
 func (job *Job) success(retrigger bool) {
@@ -266,14 +239,8 @@ func (job *Job) success(retrigger bool) {
 	job.CurrentRetry = 0
 
 	if retrigger {
-		if job.RegularTimer > 0 {
-			timeTaken := time.Duration(time.Now().UnixNano()-job.lastSuccess) - job.RegularTimer
-			job.lastSuccess = time.Now().UnixNano()
-			toWait := job.RegularTimer
-			if timeTaken > 0 && timeTaken <= toWait {
-				toWait -= timeTaken
-			}
-			go job.SendTriggerWithDelay(toWait)
+		if job.regTimerSchedule != nil {
+			go job.SendTriggerWithDelay(job.durationTillNextRegularTrigger())
 		}
 	}
 
@@ -293,6 +260,7 @@ func (job *Job) fail() {
 
 func (job *Job) failPreconds() {
 	log.WithFields(log.Fields{"Job": job.JobName}).Error("Failed Preconditions. Will try again at next regular trigger")
+	go job.SendTriggerWithDelay(job.durationTillNextRegularTrigger())
 }
 
 func (job *Job) finish(finishCallback func()) {

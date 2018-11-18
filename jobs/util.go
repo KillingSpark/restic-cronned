@@ -3,11 +3,11 @@ package jobs
 import (
 	"encoding/json"
 	"errors"
+	"github.com/robfig/cron"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -21,8 +21,20 @@ func LoadJobFromFile(file *os.File) (*Job, error) {
 		return nil, err
 	}
 	job.retrieveAndStorePassword()
-	job.RegularTimer *= time.Second
-	job.RetryTimer *= time.Second
+	if len(job.RegularTimer) > 0 {
+		job.regTimerSchedule, err = cron.Parse(job.RegularTimer)
+		if err != nil {
+			log.WithFields(log.Fields{"Job": job.JobName, "Error": err.Error()}).Warning("Decoding error for the RegularTimer")
+			return nil, err
+		}
+	}
+	if len(job.RetryTimer) > 0 {
+		job.retryTimerSchedule, err = cron.Parse(job.RetryTimer)
+		if err != nil {
+			log.WithFields(log.Fields{"Job": job.JobName, "Error": err.Error()}).Warning("Decoding error for the RetryTimer")
+			return nil, err
+		}
+	}
 	return job, nil
 }
 
