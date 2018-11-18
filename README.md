@@ -6,6 +6,7 @@ Obviously depends on [restic](https://github.com/restic/restic)
 * multiple jobs
 * jobs that can trigger follow-up jobs
 * passwords from all keyrings that github.com/zalando/go-keyring supports
+* timers in cron style format
 * separate timer for retries from regular timers
 * an http server where you can fetch the current state of your jobs
 
@@ -38,8 +39,8 @@ Jobs are defined in json files with this structure (see ExampleBackup/Forget.jso
 These files need to be in a directory, that is specified by the first command line parameter
 ```
 {
-    "regularTimer":     int (seconds),  //interval for regular starting of a job. Can be set x < 0 for a job that only gets triggered by other jobs
-    "retryTimer":       int (seconds),  //interval for retries if a job has failed.
+    "regularTimer":     string          //cron style definition of a time (non standard, the first entry is seconds not minutes)
+    "retryTimer":       string          //cron style definition of a time (non standard, the first entry is seconds not minutes)          
     "maxFailedRetries": int,            //maximum retries before the job is killed entirely. Can be set to x < 0 for infinitly many  
     "JobName":          string,         //Identifies the Job. Recommended to be the same as the filename
     "NextJob"           string,         //Identifies the Job that should be triggered after this one
@@ -60,15 +61,15 @@ These files need to be in a directory, that is specified by the first command li
 }
 ```
 
-This example backups /var/www/my-site daily to a nfs (served by the server mynfshost) mounted on /tmp/backup
-If the backup failed (maybe for connectivity issues or whatever) it retries 3 times hourly  
-It also forgets about the old snapshots and keeps the last 30 (about a month) by triggering forget from the Backup 
+This example backups /var/www/my-site at 02:00am to a nfs (served by the server mynfshost) mounted on /tmp/backup.  
+If the backup failed (maybe for connectivity issues or whatever) it retries hourly, 3 times total.  
+It also forgets about the old snapshots and keeps the last 30 (about a month) by triggering forget from the Backup.  
 
 ExmapleBackup.json
 ```
 {
-    "regularTimer": 86400,
-    "retryTimer": 3600,
+    "regularTimer": "0 0 2 * * *",
+    "retryTimer": "0 0 * * * *",
     "maxFailedRetries": 2,
     "JobName": "ExampleBackup",
     "NextJob": "ExampleForget",
@@ -88,8 +89,7 @@ This job will not be triggered on its own, but only if the backup job succeeded
 ExampleForget.json
 ```
 {
-    "regularTimer": -1,
-    "retryTimer": 3600,
+    "retryTimer": "0 0 * * * *",
     "maxFailedRetries": 3,
     "JobName": "ExampleForget",
     "Username":"Apache",
@@ -98,19 +98,11 @@ ExampleForget.json
 }
 ```
 
-Jobs save their last successful run time in a file in $HOME/.local/share/restic-cronned/<Jobname>. If this file exists when the Job gets started it 
-calculates his initial trigger time accordingly so the jobs run somewhat regularly if the system/the queue is restarted
-
 ## Restarts/Suspends/Crashes ##
-Whenever a job schedules a trigger a file is written: "$HOME/.local/shar/restic-cronned/JOBNAME" this contains a timestamp when the job should be triggered. When a job is started it looks for this file.  
-* If it does not exist the job gets triggered right away (new jobs for example!).  
-* If it does exist but is not readable/decodable the job will wait its regular time for the next trigger (which will be written into this file)  
-* If it does exist and the timestamp is still in the future it will wait the time left until this timestamp.
-* If it does exist and the timestamo is in the past the job will be triggered right away. Until now the job will then wait its regular timer. That can shift your cycle. Plans to fix this exist.   
-
+When a job get scheduled it calculates the time when it should wake up. Then it sleeps for 10 seconds and checks against this time, until the limit is reached. This way restarts/suspends/chrashes should not bother the job too much. Jobs that should have been run when the system was suspended will be run (almost) immediatly when it gets unsuspended
 
 ## Passwords ##
-For convenience (and to be sure the keys can be read correctly from the keyring) the rckeyutil can be used to set/get/delete the repo keys.  
+For convenience (and to be sure the keys can be read correctly from the keyring) the rckeyutil should be used to set/get/delete the repo keys.  
 Usage:
 * `rckeyutil set Service Username key`
 * `rckeyutil del Service Username`
@@ -133,6 +125,6 @@ Translates into ```/COMMAND?name=JOBNAME```. If no name is needed it is ignored 
 
 # Future plans #
 1. Better configuration maybe using viper/cobra/... (right now just loading a config json file. Works well enough though)
-1. Improve lock watching for repos. Right now there are still race conditions if two jobs are working on the same repo. But one can use the triggers to avoid these.
-1. Better output for/from the command-wrapper tool
+2. Improve lock watching for repos. Right now there are still race conditions if two jobs are working on the same repo. But one can use the triggers to avoid these.
+3. Better output for/from the command-wrapper tool
 

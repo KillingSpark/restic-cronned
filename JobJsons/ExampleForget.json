@@ -1,6 +1,5 @@
 {
-    "regularTimer": -1,
-    "retryTimer": 3600,
+    "retryTimer": "0 0 * * * *",
     "maxFailedRetries": 3,
     "JobName": "ExampleForget",
     "Username":"Apache",

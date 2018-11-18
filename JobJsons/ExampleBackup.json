@@ -1,6 +1,6 @@
 {
-    "regularTimer": 86400,
-    "retryTimer": 3600,
+    "regularTimer": "0 0 2 * * *",
+    "retryTimer": "0 0 * * * *",
     "maxFailedRetries": 2,
     "JobName": "ExampleBackup",
     "NextJob": "ExampleForget",
