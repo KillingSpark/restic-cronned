@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/KillingSpark/restic-cronned/jobs"
+	"github.com/killingspark/restic-cronned/jobs"
 )
 
 //StartServer blockingly starts the server that serves information abut the queue

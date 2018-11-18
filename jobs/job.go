@@ -17,10 +17,6 @@ import (
 	keyring "github.com/zalando/go-keyring"
 )
 
-var (
-//log = log.New()
-)
-
 //Job represents one job that will be run in a Queue
 type Job struct {
 	//timers that get waited
@@ -46,13 +42,16 @@ type Job struct {
 	//interface to the queue that lats you query for jobs. used for triggerNext
 	jobstore JobStore
 	//generic data from the config files
-	JobNameToTrigger string `json:"NextJob"`
-	JobName          string `json:"JobName"`
-	Username         string `json:"Username"`
-	Service          string `json:"Service"`
-	password         string
-	ResticPath       string   `json:"ResticPath"`
-	ResticArguments  []string `json:"ResticArguments"`
+	JobNameToTrigger      string `json:"NextJob"`
+	JobName               string `json:"JobName"`
+	Username              string `json:"Username"`
+	Service               string `json:"Service"`
+	password              string
+	ResticPath            string           `json:"ResticPath"`
+	ResticArguments       []string         `json:"ResticArguments"`
+	Preconditions         JobPreconditions `json:"Preconditions"`
+	CheckPrecondsEvery    int              `json:"CheckPrecondsEvery"`
+	CheckPrecondsMaxTimes int              `json:"CheckPrecondsMaxTimes"`
 }
 
 func newJob() *Job {
@@ -177,6 +176,18 @@ func (job *Job) loop(finishCallback func()) {
 			return
 		}
 
+		preconds := false
+		for i := 0; !preconds && i < job.CheckPrecondsMaxTimes; i++ {
+			preconds = job.Preconditions.CheckAll()
+			if !preconds {
+				time.Sleep(time.Duration(job.CheckPrecondsEvery) * time.Second)
+			}
+		}
+		if !preconds {
+			job.failPreconds()
+			continue
+		}
+
 		result := job.run()
 		switch result {
 		case returnRetry:
@@ -184,7 +195,6 @@ func (job *Job) loop(finishCallback func()) {
 				job.retry()
 			} else {
 				job.fail()
-				return
 			}
 			break
 		case returnOk:
@@ -278,7 +288,11 @@ func (job *Job) Stop() {
 }
 
 func (job *Job) fail() {
-	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Error("Failed")
+	log.WithFields(log.Fields{"Job": job.JobName, "Retries": job.CurrentRetry}).Error("Failed. Will try again at next regular trigger")
+}
+
+func (job *Job) failPreconds() {
+	log.WithFields(log.Fields{"Job": job.JobName}).Error("Failed Preconditions. Will try again at next regular trigger")
 }
 
 func (job *Job) finish(finishCallback func()) {

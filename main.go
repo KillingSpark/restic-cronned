@@ -5,9 +5,9 @@ import (
 	"os"
 	"path"
 
-	"github.com/KillingSpark/restic-cronned/jobs"
-	"github.com/KillingSpark/restic-cronned/output"
 	log "github.com/Sirupsen/logrus"
+	"github.com/killingspark/restic-cronned/jobs"
+	"github.com/killingspark/restic-cronned/output"
 	"github.com/rshmelev/lumberjack"
 )
 
