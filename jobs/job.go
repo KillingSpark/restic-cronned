@@ -166,16 +166,18 @@ func (job *Job) loop(finishCallback func()) {
 			return
 		}
 
-		preconds := true
-		for i := 0; !preconds && i < job.CheckPrecondsMaxTimes; i++ {
-			preconds = job.Preconditions.CheckAll()
-			if !preconds {
-				time.Sleep(time.Duration(job.CheckPrecondsEvery) * time.Second)
+		if job.CheckPrecondsMaxTimes > 0 {
+			preconds := false
+			for i := 0; !preconds && i < job.CheckPrecondsMaxTimes; i++ {
+				preconds = job.Preconditions.CheckAll()
+				if !preconds {
+					time.Sleep(time.Duration(job.CheckPrecondsEvery) * time.Second)
+				}
 			}
-		}
-		if !preconds {
-			job.failPreconds()
-			continue
+			if !preconds {
+				job.failPreconds()
+				continue
+			}
 		}
 
 		result := job.run()

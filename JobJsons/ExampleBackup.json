@@ -7,6 +7,9 @@
     "Username":"Apache",
     "Service": "restic-repo1",
     "ResticArguments": ["-r", "/tmp/backup", "backup", "/var/www/my-site"],
+
+    "CheckPrecondsEvery": 20,
+    "CheckPrecondsMaxTimes": 100,
     "Preconditions": {
         "HostsMustRoute": ["localhost"],
         "PathesMust": ["/tmp/backup"],

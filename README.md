@@ -49,6 +49,8 @@ These files need to be in a directory, that is specified by the first command li
     "ResticPath":       string,          //Optional path to the executable of restic (maybe different versions for different repos, not in PATH...)
     "ResticArguments":  [string],        //all arguments for restic
 
+    "CheckPrecondsEvery": int,           //If the check fails, retry x seconds later again
+    "CheckPrecondsMaxTimes": int         //After y attempts the preconditions on this job are assumed to not be met any time in this period
     "Preconditions":
     {
         "PathesMust": [string],          //Pathes that must be present and not empty for the job to run (e.g. the mount point of an nfs)
@@ -76,6 +78,9 @@ ExmapleBackup.json
     "Username":"Apache",
     "Service": "restic-repo1",
     "ResticArguments": ["-r", "/tmp/backup", "backup", "/var/www/my-site"],
+
+    "CheckPrecondsEvery": 20,
+    "CheckPrecondsMaxTimes": 100,
     "Preconditions": {
         "HostsMustRoute": ["mynfshost"],
         "PathesMust": ["/tmp/backup"],

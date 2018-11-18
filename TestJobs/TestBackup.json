@@ -7,6 +7,9 @@
     "Username":"testuser",
     "Service": "test",
     "ResticArguments": ["-r", "./testrepo", "backup", "./TestJobs"],
+
+    "CheckPrecondsEvery": 20,
+    "CheckPrecondsMaxTimes": 100,
     "Preconditions": {
         "HostsMustRoute": ["localhost"],
         "PathesMust": ["./testrepo"],

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 	"strconv"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 type JobPreconditions struct {
@@ -17,13 +19,25 @@ type JobPreconditions struct {
 func (jp *JobPreconditions) CheckAll() bool {
 	allGood := true
 	for _, pm := range jp.PathesMust {
-		allGood = allGood && pm.CheckCondition()
+		r := pm.CheckCondition()
+		allGood = allGood && r
+		if !r {
+			log.WithFields(log.Fields{"Path": string(pm)}).Error("Precondition failed")
+		}
 	}
 	for _, hmr := range jp.HostsMustRoute {
-		allGood = allGood && hmr.CheckCondition()
+		r := hmr.CheckCondition()
+		allGood = allGood && r
+		if !r {
+			log.WithFields(log.Fields{"Host": string(hmr)}).Error("Precondition failed")
+		}
 	}
 	for _, hmc := range jp.HostsMustConnect {
-		allGood = allGood && hmc.CheckCondition()
+		r := hmc.CheckCondition()
+		allGood = allGood && r
+		if !r {
+			log.WithFields(log.Fields{"Host": hmc.Host, "Port": hmc.Port}).Error("Precondition failed")
+		}
 	}
 	return allGood
 }
