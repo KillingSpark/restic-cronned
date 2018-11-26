@@ -11,23 +11,33 @@ Obviously depends on [restic](https://github.com/restic/restic)
 * an http server where you can fetch the current state of your jobs
 
 ## Usage ##
-`restic-cronned "/path/to/job/diretory" ":someport"`  
+```
+usage: restic-cronned [<flags>]
+
+Flags:
+      --help                   Show context-sensitive help (also try --help-long and --help-man).
+  -p, --port=PORT              Which port the server should listen on (if any)
+  -j, --jobpath=JOBPATH        Which directory contains the job descriptions
+  -c, --configpath=CONFIGPATH  Which directory contains the config file
+
+```
 The port is optional, if not given the server wont be started
   
-The config file resides in $HOME/.config/restic-cronned/config and looks like this:
+The config file resides in $HOME/.config/restic-cronned/ or /etc/restic-cronned/ and looks like this:
+
 ```
+config.json
+
 {
     "JobPath": "$HOME/.config/restic-cronned/jobs",
-    "SrvConf": {"Port": ":8080"},
-    "LogConf": {
-        "LogDir": "$HOME/.cache/restic-cronned",
-        "MaxAge": 30,
-        "MaxSize": 10
-    }
+    "ServerPort": ":8080",
+    "LogDir": "$HOME/.cache/restic-cronned",
+    "LogMaxAge": 30,
+    "LogMaxSize": 10
 }
 ```
 If any of the values are not present in your config they will default to these values.  
-Note that the values for MaxAge are given in Days and MAxSize is in MB. They correspond with the values for https://github.com/rshmelev/lumberjack  
+Note that the values for MaxAge are given in Days and MaxSize is in MB. They correspond with the values for https://github.com/rshmelev/lumberjack  
 Note also that the path and port on the commandline take precedence over the config file.  
 
 
@@ -123,7 +133,7 @@ Usage:
 Example: Set a password '1234' with reference to the example jobs: `rckeyutil set restic-repo1 Apache 1234`
 
 ## Http server ##
-Started only if a port is given as the second command line argument  
+Started only if a port is given as the second command line argument or in the config file  
 Serves the queue in json format at "/queue". Note that times are represented in nano-seconds internally.  
 Exposes commands as:  
 * `/stop?name=JOBNAME`
