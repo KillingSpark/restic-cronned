@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path"
 
@@ -9,59 +8,37 @@ import (
 	"github.com/killingspark/restic-cronned/jobs"
 	"github.com/killingspark/restic-cronned/output"
 	"github.com/rshmelev/lumberjack"
+	"github.com/spf13/viper"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-type serverConfig struct {
-	Port string `json:"Port"`
-}
+var (
+	port       = kingpin.Flag("port", "Which port the server should listen on (if any)").Short('p').String()
+	jobpath    = kingpin.Flag("jobpath", "Which directory contains the job descriptions").Short('j').String()
+	configpath = kingpin.Flag("configpath", "Which directory contains the config file").Short('c').String()
+)
 
-type loggingConfig struct {
-	MaxSize int    `json:"MaxSize"`
-	MaxAge  int    `json:"MaxAge"`
-	LogDir  string `json:"LogDir"`
-}
-
-type config struct {
-	JobPath string        `json:"JobPath"`
-	SrvConf serverConfig  `json:"SrvConf"`
-	LogConf loggingConfig `json:"LogConf"`
-}
-
-func setupLogging(conf loggingConfig) {
+func setupLogging() {
 	log.SetFormatter(&log.TextFormatter{})
-	logpath := os.ExpandEnv(conf.LogDir)
+	logpath := os.ExpandEnv(viper.GetString("LogDir"))
 	os.MkdirAll(logpath, 0700) //readwrite for user only
 	log.SetOutput(&lumberjack.Logger{
 		Filename: path.Join(logpath, "restic-cronned.log"),
-		MaxSize:  conf.MaxSize, // megabytes
-		MaxAge:   conf.MaxAge,  //days
+		MaxSize:  viper.GetInt("LogMaxSize"), // megabytes
+		MaxAge:   viper.GetInt("LogMaxAge"),  //days
 	})
 }
 
-func startDaemon(conf config) {
-	var jobDirPath = os.ExpandEnv(conf.JobPath)
-	var port = conf.SrvConf.Port
-
-	if len(os.Args) > 1 {
-		jobDirPath = os.Args[1]
-	}
-
-	if len(os.Args) > 2 {
-		port = os.Args[2]
-	}
-
-	println("Path: " + jobDirPath)
-	println("Port: " + port)
-
-	queue, err := jobs.NewJobQueue(jobDirPath)
+func startDaemon() {
+	queue, err := jobs.NewJobQueue(*jobpath)
 	if err != nil {
 		println(err.Error())
 		return
 	}
 	queue.StartQueue()
 
-	if len(port) > 2 {
-		go output.StartServer(queue, port)
+	if len(*port) > 2 {
+		go output.StartServer(queue, *port)
 	} else {
 		println("no valid port specified -> no status server started")
 	}
@@ -70,30 +47,39 @@ func startDaemon(conf config) {
 	log.Info("All Jobs stopped")
 }
 
-func loadConfig() config {
-	conf := config{}
-	//default config
-	conf.JobPath = os.ExpandEnv("$HOME/.config/restic-cronned/jobs/")
-	conf.SrvConf.Port = ":8080"
-	conf.LogConf.MaxAge = 30
-	conf.LogConf.MaxSize = 10
-	conf.LogConf.LogDir = os.ExpandEnv("$HOME/.cache/restic-cronned")
-	confPath := os.ExpandEnv("$HOME") + "/.config/restic-cronned/config"
+func loadConfig() {
+	kingpin.Parse()
 
-	confFile, err := os.Open(confPath)
-	if err != nil {
-		println("config file not found at: " + confPath + " -> using default config")
-	} else {
-		err = json.NewDecoder(confFile).Decode(&conf)
-		if err != nil {
-			println(err.Error())
-		}
+	if *configpath != "" {
+		viper.AddConfigPath(*configpath) // call multiple times to add many search paths
+		println("ConfigPath: " + *configpath)
 	}
-	return conf
+
+	viper.SetConfigName("config")                       // name of config file (without extension)
+	viper.AddConfigPath("/etc/restic-cronned/")         // path to look for the config file in
+	viper.AddConfigPath("$HOME/.config/restic-cronned") // call multiple times to add many search paths
+
+	viper.SetDefault("JobPath", os.ExpandEnv("$HOME/.config/restic-cronned/jobs/"))
+	viper.SetDefault("ServerPort", ":8080")
+	viper.SetDefault("LogMaxAge", 30)
+	viper.SetDefault("LogMaxSize", 10)
+	viper.SetDefault("LogDir", os.ExpandEnv("$HOME/.cache/restic-cronned"))
+
+	viper.ReadInConfig()
+
+	if *jobpath == "" {
+		*jobpath = os.ExpandEnv(viper.GetString("JobPath"))
+	}
+	if *port == "" {
+		*port = viper.GetString("ServerPort")
+	}
+
+	println("JobPath: " + *jobpath)
+	println("Port: " + *port)
 }
 
 func main() {
-	conf := loadConfig()
-	setupLogging(conf.LogConf)
-	startDaemon(conf)
+	loadConfig()
+	setupLogging()
+	startDaemon()
 }

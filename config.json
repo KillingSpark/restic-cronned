@@ -1,0 +1,7 @@
+{
+    "JobPath": "$HOME/.config/restic-cronned/jobs",
+    "ServerPort": ":8080",
+    "LogDir": "$HOME/.cache/restic-cronned",
+    "LogMaxAge": 30,
+    "LogMaxSize": 10
+}
