@@ -146,7 +146,6 @@ You can use the rccommand tool to do these for you if you dont want to use curl
 Translates into ```/COMMAND?name=JOBNAME```. If no name is needed it is ignored if given. 
 
 # Future plans #
-1. Better configuration maybe using viper/cobra/... (right now just loading a config json file. Works well enough though)
 2. Improve lock watching for repos. Right now there are still race conditions if two jobs are working on the same repo. But one can use the triggers to avoid these.
 3. Better output for/from the command-wrapper tool
 
