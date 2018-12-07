@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=ResticCronned
-Exec=restic-cronned
+Exec=rc-daemon
 Icon=STOCK_FLOPPY
 Type=Application
 Categories=System;
