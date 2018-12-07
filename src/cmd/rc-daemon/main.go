@@ -5,8 +5,8 @@ import (
 	"path"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/killingspark/restic-cronned/jobs"
-	"github.com/killingspark/restic-cronned/output"
+	"github.com/killingspark/restic-cronned/src/jobs"
+	"github.com/killingspark/restic-cronned/src/output"
 	"github.com/rshmelev/lumberjack"
 	"github.com/spf13/viper"
 	"gopkg.in/alecthomas/kingpin.v2"
