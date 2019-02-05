@@ -1,0 +1,5 @@
+{
+    "JobToTrigger": "ExampleForget",
+    "retryTimer": "0 0 * * * *",
+    "maxFailedRetries": 3
+}

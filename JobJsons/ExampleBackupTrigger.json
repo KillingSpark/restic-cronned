@@ -1,0 +1,9 @@
+{
+    "JobToTrigger": "ExampleBackup",
+    "regularTimer": "0 0 2 * * *",
+    "retryTimer": "0 0 * * * *",
+    "maxFailedRetries": 2,
+
+    "CheckPrecondsEvery": 20,
+    "CheckPrecondsMaxTimes": 100
+}

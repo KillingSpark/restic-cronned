@@ -1,6 +1,4 @@
 {
-    "retryTimer": "0 0 * * * *",
-    "maxFailedRetries": 3,
     "JobName": "ExampleForget",
     "Username":"Apache",
     "Service": "restic-repo1",

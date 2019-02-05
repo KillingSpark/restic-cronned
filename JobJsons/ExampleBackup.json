@@ -1,15 +1,10 @@
 {
-    "regularTimer": "0 0 2 * * *",
-    "retryTimer": "0 0 * * * *",
-    "maxFailedRetries": 2,
     "JobName": "ExampleBackup",
-    "NextJob": "ExampleForget",
+    "NextJobs": ["ExampleForget"],
     "Username":"Apache",
     "Service": "restic-repo1",
     "ResticArguments": ["-r", "/tmp/backup", "backup", "/var/www/my-site"],
 
-    "CheckPrecondsEvery": 20,
-    "CheckPrecondsMaxTimes": 100,
     "Preconditions": {
         "HostsMustRoute": ["localhost"],
         "PathesMust": ["/tmp/backup"],
