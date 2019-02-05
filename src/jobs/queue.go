@@ -19,12 +19,76 @@ type JobQueue struct {
 }
 
 //StartQueue starts all the jobs in the directory
-func (queue *JobQueue) StartQueue() {
-	_, err := FindJobs(queue.Directory)
+func (queue *JobQueue) StartQueue() error {
+	println("Searching jobs")
+	jobs, err := FindJobs(path.Join(queue.Directory, "jobs"))
 	if err != nil {
-		println(err.Error())
-		return
+		return err
 	}
+
+	println("Searching triggers")
+	triggers, err := FindTriggers(path.Join(queue.Directory, "triggers"))
+	if err != nil {
+		return err
+	}
+
+	//enter all jobs into the queue
+	for _, j := range jobs {
+		if _, ok := queue.Jobs[j.JobName]; ok {
+			return errors.New("Two jobs with same name: " + j.JobName)
+		}
+		queue.Jobs[j.JobName] = j
+	}
+	// NextJob resolution
+	for _, j := range queue.Jobs {
+		for _, n := range j.NextJobs {
+			nj, ok := queue.Jobs[n]
+			if !ok {
+				return errors.New("NextJob " + n + "not found for Job" + j.JobName)
+			}
+			j.nextTriggers = append(j.nextTriggers, nj)
+		}
+	}
+
+	//enter all timed triggers into the queue
+	for _, t := range triggers {
+		var ok bool
+		t.ToTrigger, ok = queue.Jobs[t.JobToTrigger]
+		if !ok {
+			return errors.New("JobToTrigger not found:" + t.JobToTrigger)
+		}
+		queue.Triggers[t.JobToTrigger] = append(queue.Triggers[t.JobToTrigger], t)
+	}
+	//start trigger loops
+	for _, trs := range queue.Triggers {
+		for _, t := range trs {
+			go t.loop()
+		}
+	}
+	return nil
+}
+
+func (queue *JobQueue) RestartJob(name string) error {
+	triggers, ok := queue.Triggers[name]
+	if !ok {
+		return errors.New("No such Job")
+	}
+	for _, tr := range triggers {
+		tr.Kill <- 0
+		<-tr.Kill
+	}
+	err := queue.ReloadJob(name)
+	if err != nil {
+		return err
+	}
+	for _, tr := range triggers {
+		go tr.loop()
+	}
+	return nil
+}
+
+func (queue *JobQueue) WaitForAllJobs() error {
+	select {}
 }
 
 //StopJob stops all timed trigger for the job with this name
@@ -72,7 +136,6 @@ func (queue *JobQueue) StopAllJobs() {
 }
 
 //ReloadJob reloads the file (with all changes made to it) and replaces the old job with the new one.
-//the old job is stopped (and waited for until stopped) before the new job is started
 func (queue *JobQueue) ReloadJob(name string) error {
 	oldJob, ok := queue.Jobs[name]
 
@@ -80,7 +143,7 @@ func (queue *JobQueue) ReloadJob(name string) error {
 		return errors.New("No such job")
 	}
 
-	files, err := ioutil.ReadDir(queue.Directory)
+	files, err := ioutil.ReadDir(path.Join(queue.Directory, "jobs"))
 	if err != nil {
 		log.Error("Error opening the directory: " + err.Error())
 	}
@@ -107,21 +170,22 @@ func (queue *JobQueue) ReloadJob(name string) error {
 			return errors.New("Name change not allowed")
 		}
 		queue.replaceJob(job, oldJob)
-		if err != nil {
-			print(err.Error())
-		}
-		return err
+
+		return nil
 	}
 	log.WithFields(log.Fields{"Job": name}).Warning("No file for job")
 	return errors.New("File could not be found")
 }
 
 func (queue *JobQueue) replaceJob(newJob, oldJob *Job) {
-	triggers, ok := queue.Triggers[oldJob.JobName]
+	//assume checking before that call
+	triggers := queue.Triggers[oldJob.JobName]
 
 	//patch job into all Triggers
 	for _, tr := range triggers {
+		tr.Lock.Lock()
 		tr.ToTrigger = newJob
+		tr.Lock.Unlock()
 	}
 
 	queue.Jobs[newJob.JobName] = newJob

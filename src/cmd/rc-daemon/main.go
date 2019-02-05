@@ -35,7 +35,15 @@ func startDaemon() {
 		println(err.Error())
 		return
 	}
-	queue.StartQueue()
+
+	println("Starting queue")
+	err = queue.StartQueue()
+	if err != nil {
+		println(err.Error())
+		println("Aborting")
+		return
+	}
+	println("Started queue")
 
 	if len(*port) > 2 {
 		go output.StartServer(queue, *port)
@@ -43,6 +51,7 @@ func startDaemon() {
 		println("no valid port specified -> no status server started")
 	}
 
+	println("Waiting for jobs")
 	queue.WaitForAllJobs()
 	log.Info("All Jobs stopped")
 }
@@ -55,11 +64,11 @@ func loadConfig() {
 		println("ConfigPath: " + *configpath)
 	}
 
-	viper.SetConfigName("config")                       // name of config file (without extension)
+	viper.SetConfigName("config.json")                  // name of config file
 	viper.AddConfigPath("/etc/restic-cronned/")         // path to look for the config file in
 	viper.AddConfigPath("$HOME/.config/restic-cronned") // call multiple times to add many search paths
 
-	viper.SetDefault("JobPath", os.ExpandEnv("$HOME/.config/restic-cronned/jobs/"))
+	viper.SetDefault("JobPath", os.ExpandEnv("$HOME/.config/restic-cronned/"))
 	viper.SetDefault("ServerPort", ":8080")
 	viper.SetDefault("LogMaxAge", 30)
 	viper.SetDefault("LogMaxSize", 10)

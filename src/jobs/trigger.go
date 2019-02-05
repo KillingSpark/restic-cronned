@@ -3,6 +3,7 @@ package jobs
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/robfig/cron"
+	"sync"
 	"time"
 )
 
@@ -13,14 +14,13 @@ type Triggerable interface {
 }
 
 type TimedTrigger struct {
-	ToTrigger Triggerable
-	Kill      chan int
+	JobToTrigger string
+	ToTrigger    Triggerable
+	Lock         sync.Mutex //protects access on ToTrigger
+	Kill         chan int
 
-	RegularTimer       string `json:"regularTimer"`
 	regTimerSchedule   cron.Schedule
-	RetryTimer         string `json:"retryTimer"`
 	retryTimerSchedule cron.Schedule
-	WaitGranularity    string `json:"waitGranularity"`
 	waitGran           time.Duration
 
 	CurrentRetry     int `json:"CurrentRetry"`
@@ -57,15 +57,21 @@ func (tt *TimedTrigger) NextTriggerWithDelay(dur time.Duration) {
 			}
 		}
 	}
-	if dur >= 0 {
-		tt.ToTrigger.Trigger()
+	if dur == 0 {
+		//Nothing
 	}
 }
 
 func (tt *TimedTrigger) loop() {
+	if tt.regTimerSchedule == nil {
+		//dont loop on triggers if no timer present
+		log.WithFields(log.Fields{"Job": tt.ToTrigger.Name()}).Info("Skipping looping, because no timer was set")
+		return
+	}
+	//wait for first regular trigger before looping
+	log.WithFields(log.Fields{"Job": tt.ToTrigger.Name()}).Info("Waiting before the first run of the job")
+	tt.NextTriggerWithDelay(tt.durationTillNextRegularTrigger())
 	for {
-		log.WithFields(log.Fields{"Job": tt.ToTrigger.Name()}).Info("Await trigger/stop")
-
 		select {
 		case <-tt.Kill:
 			tt.Kill <- 0
@@ -75,21 +81,16 @@ func (tt *TimedTrigger) loop() {
 
 		log.WithFields(log.Fields{"Job": tt.ToTrigger.Name()}).Info("Waiting finished an no kill received")
 
-		if tt.CheckPrecondsMaxTimes > 0 {
-			preconds := false
-			for i := 0; !preconds && i < tt.CheckPrecondsMaxTimes; i++ {
-				preconds = tt.ToTrigger.CheckPreconditions()
-				if !preconds {
-					time.Sleep(time.Duration(tt.CheckPrecondsEvery) * time.Second)
-				}
-			}
-			if !preconds {
-				tt.failPreconds()
-				continue
-			}
+		if !tt.waitPreconds() {
+			tt.failPreconds() // --> wait till next regular
+			tt.NextTriggerWithDelay(tt.durationTillNextRegularTrigger())
+			continue
 		}
 
+		tt.Lock.Lock()
 		result := tt.ToTrigger.Trigger()
+		tt.Lock.Unlock()
+
 		switch result {
 		case returnRetry:
 			if tt.CurrentRetry < tt.MaxFailedRetries {
@@ -106,6 +107,20 @@ func (tt *TimedTrigger) loop() {
 			return
 		}
 	}
+}
+
+func (tt *TimedTrigger) waitPreconds() bool {
+	if tt.CheckPrecondsMaxTimes > 0 {
+		preconds := false
+		for i := 0; !preconds && i < tt.CheckPrecondsMaxTimes; i++ {
+			preconds = tt.ToTrigger.CheckPreconditions()
+			if !preconds {
+				time.Sleep(time.Duration(tt.CheckPrecondsEvery) * time.Second)
+			}
+		}
+		return preconds
+	}
+	return true
 }
 
 func (tt *TimedTrigger) durationTillNextRegularTrigger() time.Duration {
@@ -137,7 +152,6 @@ func (tt *TimedTrigger) fail() {
 
 func (tt *TimedTrigger) failPreconds() {
 	log.WithFields(log.Fields{"Job": tt.ToTrigger.Name()}).Error("Failed Preconditions. Will try again at next regular trigger")
-	tt.NextTriggerWithDelay(tt.durationTillNextRegularTrigger())
 }
 
 func (tt *TimedTrigger) success() {
