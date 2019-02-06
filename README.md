@@ -42,26 +42,21 @@ Note also that the path and port on the commandline take precedence over the con
 
 
 ## Job definition ##
-A Job is one restic action like backup or forget. It can be triggered periodically by itself or it can be triggered by another Job.  
-A Job can for example backup a folder and then trigger a forget on the same repo. With this approach no lock races should occur.
+A Job is one restic action like backup or forget. It can be triggered periodically by a TimedTrigger or it can be triggered by another Job.  
+A Job can for example backup a folder and then trigger a forget on the same repo. With this approach no lock races by different restic processes on the repo should occur.
 
 Jobs are defined in json files with this structure (see ExampleBackup/Forget.json):  
 These files need to be in a directory, that is specified by the first command line parameter
 ```
-{
-    "regularTimer":     string          //cron style definition of a time (non standard, the first entry is seconds not minutes)
-    "retryTimer":       string          //cron style definition of a time (non standard, the first entry is seconds not minutes)          
-    "maxFailedRetries": int,            //maximum retries before the job is killed entirely. Can be set to x < 0 for infinitly many  
+{ 
     "JobName":          string,         //Identifies the Job. Recommended to be the same as the filename
-    "NextJob"           string,         //Identifies the Job that should be triggered after this one
+    "NextJobs"          [string],       //Identifies the Jobs that should be triggered after this one
     "Username":         string,         //Username that was used to put the restic-repo password into the keyring
     "Service":          string,         //Service that was used to put the restic-repo password into the keyring
     "ResticPath":       string,          //Optional path to the executable of restic (maybe different versions for different repos, not in PATH...)
     "ResticArguments":  [string],        //all arguments for restic
 
-    "CheckPrecondsEvery": int,           //If the check fails, retry x seconds later again
-    "CheckPrecondsMaxTimes": int         //After y attempts the preconditions on this job are assumed to not be met any time in this period
-    "Preconditions":
+   "Preconditions":
     {
         "PathesMust": [string],          //Pathes that must be present and not empty for the job to run (e.g. the mount point of an nfs)
         "HostsMustRoute": [string],      //Hosts that must be routable for the job to run (e.g. the host of an nfs or a sftp server)
@@ -79,46 +74,27 @@ job execution unecessarly until the next retry timer.
 
 Retry timer exist for actual failures(maybe other processes lock the repo, the connection dropped in the middle,...)
 
-### Example ###
-This example backups /var/www/my-site at 02:00am to a nfs (served by the server mynfshost) mounted on /tmp/backup.  
+
+## Trigger definition ##
+A Trigger is defines the periodic runs for a job. It triggers the job after checking precoditions (and waiting on them if necessary).
+```
+{
+    "regularTimer":     string          //cron style definition of a time (non standard, the first entry is seconds not minutes)
+    "retryTimer":       string          //cron style definition of a time (non standard, the first entry is seconds not minutes)          
+    "maxFailedRetries": int,            //maximum retries before the job is killed entirely. Can be set to x < 0 for infinitly many 
+
+    "CheckPrecondsEvery": int,           //If the check fails, retry x seconds later again
+    "CheckPrecondsMaxTimes": int         //After y attempts the preconditions on this job are assumed to not be met any time in this period
+}
+```
+
+## Example ##
+The Examples in the directory "JobJsons" show two jobs and a trigger for the first one which triggers a second one.
+
+The example backs up /var/www/my-site at 02:00am to a nfs (served by the server mynfshost) mounted on /tmp/backup.  
 If the backup failed (maybe for connectivity issues or whatever) it retries hourly, 3 times total.  
 It also forgets about the old snapshots and keeps the last 30 (about a month) by triggering a ForgetJob from the BackupJob.  
 
-ExmapleBackup.json
-```
-{
-    "regularTimer": "0 0 2 * * *",
-    "retryTimer": "0 0 * * * *",
-    "maxFailedRetries": 2,
-    "JobName": "ExampleBackup",
-    "NextJob": "ExampleForget",
-    "Username":"Apache",
-    "Service": "restic-repo1",
-    "ResticArguments": ["-r", "/tmp/backup", "backup", "/var/www/my-site"],
-
-    "CheckPrecondsEvery": 20,
-    "CheckPrecondsMaxTimes": 100,
-    "Preconditions": {
-        "HostsMustRoute": ["mynfshost"],
-        "PathesMust": ["/tmp/backup"],
-        "HostsMustConnect": [{"Host": "google.com", "Port": 80}]
-    }
-}
-```
-  
-This job will not be triggered on its own, but only if the backup job succeeded
-  
-ExampleForget.json
-```
-{
-    "retryTimer": "0 0 * * * *",
-    "maxFailedRetries": 3,
-    "JobName": "ExampleForget",
-    "Username":"Apache",
-    "Service": "restic-repo1",
-    "ResticArguments": ["-r", "/tmp/backup", "forget", "--keep-last", "30"]
-}
-```
 
 ## Restarts/Suspends/Crashes ##
 When a job gets scheduled it calculates the time when it should wake up. Then it sleeps for 10 seconds and checks against this time, until the limit is reached. This way restarts/suspends/chrashes should not bother the jobs too much. Jobs that should have been run when the system was suspended will be run (almost) immediatly when it becomes unsuspended.

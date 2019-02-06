@@ -3,6 +3,7 @@ package jobs
 //Job a job to be run periodically
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -37,7 +38,7 @@ type Job struct {
 	password string
 }
 
-func (job *Job) Trigger() JobReturn {
+func (job *Job) Trigger(ctx *context.Context) JobReturn {
 	return job.run()
 }
 
@@ -72,7 +73,7 @@ const (
 	triggerExtern TriggerType = 1
 )
 
-func (job *Job) retrieveAndStorePassword() {
+func (job *Job) RetrieveAndStorePassword() {
 	key, err := keyring.Get(job.Service, job.Username)
 	if err != nil {
 		log.WithFields(log.Fields{"Job": job.JobName}).Warning("couldn't retrieve password.")

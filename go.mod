@@ -4,7 +4,6 @@ replace github.com/Sirupsen/logrus => github.com/sirupsen/logrus v1.1.0
 
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
-	github.com/KillingSpark/restic-cronned v0.0.5
 	github.com/Sirupsen/logrus v1.2.0
 	github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc // indirect
 	github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf // indirect
