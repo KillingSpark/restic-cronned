@@ -64,7 +64,7 @@ func (ff *FlowForest) Build(name string, store *ObjectStore) (Triggerer, error) 
 	}
 	roottrdesc, ok := store.Triggerers[flow.Root.Name]
 	if !ok {
-		return nil, errors.New("No triggerable with name: " + flow.Root.Name)
+		return nil, errors.New("No triggerer with name: " + flow.Root.Name)
 	}
 
 	roottr, err := roottrdesc.Instantiate(name + "/" + flow.Root.Name)

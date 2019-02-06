@@ -46,14 +46,14 @@ func TestMyShit(t *testing.T) {
 		t.Fail()
 	}
 
-	if !strings.HasSuffix(root.ID(), "__oneshot") {
+	if !strings.HasSuffix(root.ID(), "__parshot") {
 		t.Error("Didnt load triggerer name correctly: " + root.ID())
 		t.Fail()
 	}
 
 	//check names/ids
-	oneshot := root.(*objectstore.OneshotTrigger)
-	for _, child := range oneshot.Targets {
+	parshot := root.(*objectstore.ParallelOneshotTrigger)
+	for _, child := range parshot.Targets {
 		if !strings.HasSuffix(child.ID(), "___oneshot") {
 			t.Error("Didnt load middle-triggerer name correctly: " + child.ID())
 			t.Fail()
@@ -72,7 +72,7 @@ func TestMyShit(t *testing.T) {
 		root.Run(nil)
 	}
 
-	for _, child := range oneshot.Targets {
+	for _, child := range parshot.Targets {
 		childoneshot := child.(*objectstore.OneshotTrigger)
 		if childoneshot.TriggerCounter != runs {
 			t.Errorf("Middletrigger didnt run right amount of times: %d", childoneshot.TriggerCounter)
@@ -98,12 +98,12 @@ func TestMyShit(t *testing.T) {
 		t.Fail()
 	}
 
-	runs = 100
+	runs = 15
 	for i := 0; i < runs; i++ {
 		root.Run(nil)
 	}
 
-	oneshot = root.(*objectstore.OneshotTrigger)
+	oneshot := root.(*objectstore.OneshotTrigger)
 	for _, child := range oneshot.Targets {
 		childoneshot, ok := child.(*objectstore.OneshotTrigger)
 		if ok {

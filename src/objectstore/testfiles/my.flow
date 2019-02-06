@@ -3,7 +3,7 @@
         "Flow1": {
             "Name": "Flow1",
             "Root": {
-                "Name": "oneshot",
+                "Name": "parshot",
                 "Targets": [
                     {
                         "Name": "oneshot",
