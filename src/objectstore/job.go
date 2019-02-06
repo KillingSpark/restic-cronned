@@ -19,9 +19,9 @@ func (jd *JobDescription) ID() string {
 	return jd.JobName
 }
 
-func (jd *JobDescription) Instantiate() (Triggerable, error) {
+func (jd *JobDescription) Instantiate(unique string) (Triggerable, error) {
 	job := &jobs.Job{}
-	job.JobName = jd.JobName
+	job.JobName = unique + "__" + jd.JobName
 	job.ResticPath = jd.ResticPath
 	job.ResticArguments = jd.ResticArguments
 	job.Username = jd.Username

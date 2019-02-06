@@ -19,10 +19,10 @@ type Triggerer interface {
 }
 
 type TriggererDescription interface {
-	Instantiate() (Triggerer, error)
+	Instantiate(unique string) (Triggerer, error)
 }
 
 type TriggerableDescription interface {
-	Instantiate() (Triggerable, error)
+	Instantiate(unique string) (Triggerable, error)
 	ID() string
 }

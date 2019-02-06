@@ -25,11 +25,11 @@ func (d *TimedTriggerDescription) ID() string {
 	return d.Name
 }
 
-func (d *TimedTriggerDescription) Instantiate() (Triggerer, error) {
+func (d *TimedTriggerDescription) Instantiate(unique string) (Triggerer, error) {
 	tr := &TimedTrigger{}
 	var err error
 
-	tr.Name = d.Name + "Unique"
+	tr.Name = unique + "__" + d.Name
 
 	if len(d.RegularTimer) > 0 {
 		tr.regTimerSchedule, err = cron.Parse(d.RegularTimer)

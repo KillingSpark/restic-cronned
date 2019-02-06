@@ -36,9 +36,12 @@ type Job struct {
 
 	//retrieved from a system keyring
 	password string
+
+	TriggerCounter int
 }
 
 func (job *Job) Trigger(ctx *context.Context) JobReturn {
+	job.TriggerCounter++
 	return job.run()
 }
 
