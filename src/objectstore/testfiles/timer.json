@@ -1,0 +1,8 @@
+{
+    "Kind": {
+        "Name": "Timer"
+    },
+    "Spec": {
+        "Name": "timer"
+    }
+}

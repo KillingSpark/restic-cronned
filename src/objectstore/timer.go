@@ -29,6 +29,8 @@ func (d *TimedTriggerDescription) Instantiate() (Triggerer, error) {
 	tr := &TimedTrigger{}
 	var err error
 
+	tr.Name = d.Name + "Unique"
+
 	if len(d.RegularTimer) > 0 {
 		tr.regTimerSchedule, err = cron.Parse(d.RegularTimer)
 		if err != nil {
@@ -47,6 +49,7 @@ func (d *TimedTriggerDescription) Instantiate() (Triggerer, error) {
 }
 
 type TimedTrigger struct {
+	Name    string
 	Targets []Triggerable
 	Lock    sync.Mutex //protects access on ToTrigger
 	Kill    chan int
@@ -64,6 +67,10 @@ type TimedTrigger struct {
 	//times set when the wait is started
 	WaitStart time.Duration
 	WaitEnd   time.Duration
+}
+
+func (tt *TimedTrigger) ID() string {
+	return tt.Name
 }
 
 func (tt *TimedTrigger) AddTarget(ta Triggerable) error {

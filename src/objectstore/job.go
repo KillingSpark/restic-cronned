@@ -5,7 +5,7 @@ import (
 )
 
 type JobDescription struct {
-	JobName  string   `json:"JobName"`
+	JobName  string   `json:"Name"`
 	NextJobs []string `json:"NextJobs"`
 
 	Username        string                `json:"Username"`

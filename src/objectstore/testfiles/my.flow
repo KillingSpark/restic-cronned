@@ -1,0 +1,15 @@
+{
+    "Flows":{
+        "Flow1": {
+            "Name": "Flow1",
+            "Root": {
+                "Name": "timer",
+                "Targets": [
+                    {
+                        "Name": "backup"
+                    }
+                ]
+            }
+        }
+    }
+}

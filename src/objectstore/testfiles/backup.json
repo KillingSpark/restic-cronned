@@ -1,0 +1,8 @@
+{
+    "Kind": {
+        "Name": "Job"
+    },
+    "Spec": {
+        "Name": "backup"
+    }
+}

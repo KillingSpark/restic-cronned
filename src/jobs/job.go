@@ -42,6 +42,10 @@ func (job *Job) Trigger(ctx *context.Context) JobReturn {
 	return job.run()
 }
 
+func (job *Job) ID() string {
+	return job.JobName
+}
+
 func (job *Job) CheckPreconditions() bool {
 	return job.Preconditions.CheckAll()
 }

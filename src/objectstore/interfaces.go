@@ -9,11 +9,13 @@ type ReturnValue = jobs.JobReturn
 
 type Triggerable interface {
 	Trigger(*context.Context) ReturnValue
+	ID() string
 }
 
 type Triggerer interface {
 	AddTarget(Triggerable) error
 	Run(context.Context) error
+	ID() string
 }
 
 type TriggererDescription interface {
