@@ -27,7 +27,6 @@ func (jd *JobDescription) Instantiate(unique string) (Triggerable, error) {
 	job.Username = jd.Username
 	job.Service = jd.Service
 	job.Preconditions = jd.Preconditions
-	job.NextJobs = jd.NextJobs //need to be resolved by the queue
 	job.RetrieveAndStorePassword()
 
 	return job, nil

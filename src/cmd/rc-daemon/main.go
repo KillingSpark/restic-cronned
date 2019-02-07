@@ -1,12 +1,13 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
 	"path"
+	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/killingspark/restic-cronned/src/jobs"
-	"github.com/killingspark/restic-cronned/src/output"
+	"github.com/killingspark/restic-cronned/src/objectstore"
 	"github.com/rshmelev/lumberjack"
 	"github.com/spf13/viper"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -30,29 +31,40 @@ func setupLogging() {
 }
 
 func startDaemon() {
-	queue, err := jobs.NewJobQueue(*jobpath)
+	objs := objectstore.ObjectStore{}
+	err := objs.LoadAllObjects(*jobpath)
 	if err != nil {
 		println(err.Error())
 		return
 	}
 
-	println("Starting queue")
-	err = queue.StartQueue()
+	ff := objectstore.FlowForest{}
+	marshflow, err := ioutil.ReadFile(*jobpath + "/my.flow")
 	if err != nil {
 		println(err.Error())
-		println("Aborting")
 		return
 	}
-	println("Started queue")
+	ff.Load(marshflow)
 
-	if len(*port) > 2 {
-		go output.StartServer(queue, *port)
-	} else {
-		println("no valid port specified -> no status server started")
+	wg := sync.WaitGroup{}
+
+	for name := range ff.Flows {
+		println("Building flow: " + name)
+		flow, err := ff.Build(name, &objs)
+		if err != nil {
+			println(err.Error())
+			return
+		}
+		wg.Add(1)
+		go func() {
+			flow.Run(nil)
+			wg.Done()
+		}()
 	}
 
-	println("Waiting for jobs")
-	queue.WaitForAllJobs()
+	println("Waiting for all roots to stop")
+	wg.Wait()
+	println("All roots to stopped")
 	log.Info("All Jobs stopped")
 }
 

@@ -38,12 +38,14 @@ func (ff *FlowForest) recBuild(tr Triggerer, store *ObjectStore, node *FlowNode,
 
 		//need to recurse
 		if len(target.Targets) > 0 {
+			//first check if this target was registered as a triggerer. No real typecheck but a first hint
 			_, ok := store.Triggerers[target.Name]
 			if !ok {
 				return errors.New("No triggerer with name: " + target.Name)
 			}
-			//can be sure this works because a describtion as triggerer was registered. Check "ok" just to be sure
-			temp := triggable.(interface{})
+
+			//this SHOULD work because a description as triggerer was registered. Check value of "ok" just to be sure
+			temp := triggable.(TriggerableTriggerer)
 			triggerer, ok := temp.(Triggerer)
 			if !ok {
 				return errors.New("Couldnt convert " + target.Name + " to a Triggerer")

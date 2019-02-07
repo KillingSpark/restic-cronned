@@ -1,0 +1,13 @@
+{
+    "Kind": {
+        "Name": "Timer"
+    },
+    "Spec": {
+        "Name": "timer",
+        "regularTimer": "@every 4s",
+        "maxFailedRetries": 2,
+
+        "CheckPrecondsEvery": 20,
+        "CheckPrecondsMaxTimes": 100
+    }
+}

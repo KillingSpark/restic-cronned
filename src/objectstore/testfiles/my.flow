@@ -38,7 +38,7 @@
         "Flow2": {
             "Name": "Flow2",
             "Root": {
-                "Name": "oneshot",
+                "Name": "timer",
                 "Targets": [
                     {
                         "Name": "oneshot",

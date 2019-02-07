@@ -23,9 +23,6 @@ type Job struct {
 	//the progress of the running restic command. not working.
 	Progress float64 `json:"progress"`
 
-	NextJobs     []string `json:"NextJobs"`
-	nextTriggers []Triggerable
-
 	//generic data from the config file
 	JobName         string           `json:"JobName"`
 	Username        string           `json:"Username"`
@@ -87,17 +84,6 @@ func (job *Job) RetrieveAndStorePassword() {
 	} else {
 		log.WithFields(log.Fields{"Job": job.JobName}).Info("retrieved password.")
 		job.password = key
-	}
-}
-
-func (job *Job) triggerNextJobs() {
-	if len(job.nextTriggers) <= 0 {
-		log.WithFields(log.Fields{"Job": job.JobName}).Info("No follow up job")
-		return
-	}
-	log.WithFields(log.Fields{"Job": job.JobName}).Warning("Trigger followup jobs")
-	for _, tr := range job.nextTriggers {
-		tr.Trigger()
 	}
 }
 
@@ -180,7 +166,6 @@ func (job *Job) run() JobReturn {
 
 	switch exitCode {
 	case 0:
-		go job.triggerNextJobs()
 		return returnOk //everything fine
 	default:
 		return returnRetry //not fine but retryable
