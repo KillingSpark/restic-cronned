@@ -72,6 +72,81 @@ func (s *ObjectStore) LoadObject(objdesc *ObjectDescription) error {
 	return nil
 }
 
+func LoadFlowForest(filePath string) (*FlowForest, error) {
+	ff := &FlowForest{}
+
+	marshflow, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	err = ff.Load(marshflow)
+	if err != nil {
+		return nil, err
+	}
+	return ff, nil
+}
+
+func LoadAllFlowForrests(dirPath string) (*FlowForest, error) {
+	files, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return nil, errors.New(dirPath + " is no directory")
+	}
+
+	ff := &FlowForest{}
+
+	for _, f := range files {
+
+		//follow symlinks
+		if f.Mode()&os.ModeSymlink != 0 {
+			trgt, err := os.Readlink(path.Join(dirPath, f.Name()))
+			if err != nil {
+				return nil, err
+			}
+			f, err = os.Stat(trgt)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if f.IsDir() {
+			//recurse into directories to allow for better separation of triggers/jobs/flows without
+			//imposing a fixed directory structure
+			newff, err := LoadAllFlowForrests(path.Join(dirPath, f.Name()))
+			if err != nil {
+				return nil, err
+			}
+			ff, err = ff.Merge(newff)
+			if err != nil {
+				return nil, err
+			}
+
+			continue
+		}
+
+		if !(strings.HasSuffix(f.Name(), ".flow")) {
+			//ignore none-flow files
+			continue
+		}
+
+		marshflow, err := ioutil.ReadFile(path.Join(dirPath, f.Name()))
+		if err != nil {
+			return nil, err
+		}
+
+		newff := &FlowForest{}
+		err = json.Unmarshal(marshflow, newff)
+		if err != nil {
+			return nil, err
+		}
+
+		ff, err = ff.Merge(newff)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ff, nil
+}
+
 func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -82,7 +157,28 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 	s.Triggerers = make(map[string]TriggererDescription)
 
 	for _, f := range files {
-		if f.IsDir() || !(strings.HasSuffix(f.Name(), ".json")) {
+		//follow symlinks
+		if f.Mode()&os.ModeSymlink != 0 {
+			trgt, err := os.Readlink(path.Join(dirPath, f.Name()))
+			if err != nil {
+				return err
+			}
+			f, err = os.Stat(trgt)
+			if err != nil {
+				return err
+			}
+		}
+
+		if f.IsDir() {
+			//recurse into directories to allow for better separation of triggers/jobs/flows without
+			//imposing a fixed directory structure
+			err := s.LoadAllObjects(path.Join(dirPath, f.Name()))
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		if !(strings.HasSuffix(f.Name(), ".json")) {
 			//ignore none-json files
 			continue
 		}
@@ -96,6 +192,11 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 		err = jsonParser.Decode(objdesc)
 		if err != nil {
 			return err
+		}
+
+		if len(objdesc.Kind.Name) == 0 && len(objdesc.Spec) == 0 {
+			//skip files that are obviously no objectdescriptions
+			continue
 		}
 
 		//tries to find a probider and adds it to the correct map if found

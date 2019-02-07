@@ -1,10 +1,11 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
+	"os/signal"
 	"path"
 	"sync"
+	"syscall"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/killingspark/restic-cronned/src/objectstore"
@@ -14,8 +15,7 @@ import (
 )
 
 var (
-	port       = kingpin.Flag("port", "Which port the server should listen on (if any)").Short('p').String()
-	jobpath    = kingpin.Flag("jobpath", "Which directory contains the job descriptions").Short('j').String()
+	dirpath    = kingpin.Flag("dirpath", "Which directory contains the job/trigger/flow descriptions").Short('d').String()
 	configpath = kingpin.Flag("configpath", "Which directory contains the config file").Short('c').String()
 )
 
@@ -32,19 +32,19 @@ func setupLogging() {
 
 func startDaemon() {
 	objs := objectstore.ObjectStore{}
-	err := objs.LoadAllObjects(*jobpath)
+	err := objs.LoadAllObjects(*dirpath)
 	if err != nil {
 		println(err.Error())
 		return
 	}
 
-	ff := objectstore.FlowForest{}
-	marshflow, err := ioutil.ReadFile(*jobpath + "/my.flow")
+	ff, err := objectstore.LoadAllFlowForrests(*dirpath)
 	if err != nil {
 		println(err.Error())
 		return
 	}
-	err = ff.Load(marshflow)
+
+	builtff, err := ff.BuildAll(&objs)
 	if err != nil {
 		println(err.Error())
 		return
@@ -52,27 +52,37 @@ func startDaemon() {
 
 	wg := sync.WaitGroup{}
 
-	for name := range ff.Flows {
-		println("Building flow: " + name)
-		flow, err := ff.Build(name, &objs)
-		if err != nil {
-			println(err.Error())
-			return
-		}
+	for n := range builtff.Roots {
+		name := n
+		root := builtff.Roots[name]
 		wg.Add(1)
 		go func() {
-			flow.Run(nil)
+			log.WithFields(log.Fields{"Flow": name}).Info("Starting flow")
+			root.Run(nil)
 			wg.Done()
 		}()
 	}
 
-	println("Waiting for all roots to stop")
-	wg.Wait()
-	println("All roots to stopped")
-	log.Info("All Jobs stopped")
+	log.Info("All flows started")
+
+	rootchan := make(chan int, 1)
+	go func() {
+		wg.Wait()
+		rootchan <- 0
+	}()
+
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case _ = <-sigchan:
+		log.Info("Daemon exited after a os signal was received")
+	case _ = <-rootchan:
+		log.Info("Daemon exited after all flow roots exited")
+	}
 }
 
-func loadConfig() {
+func loadConfig() error {
 	kingpin.Parse()
 
 	if *configpath != "" {
@@ -80,31 +90,36 @@ func loadConfig() {
 		println("ConfigPath: " + *configpath)
 	}
 
-	viper.SetConfigName("config.json")                  // name of config file
 	viper.AddConfigPath("/etc/restic-cronned/")         // path to look for the config file in
 	viper.AddConfigPath("$HOME/.config/restic-cronned") // call multiple times to add many search paths
 
-	viper.SetDefault("JobPath", os.ExpandEnv("$HOME/.config/restic-cronned/"))
-	viper.SetDefault("ServerPort", ":8080")
+	viper.SetConfigType("json")
+	viper.SetConfigName("config") // name of config file
+
+	viper.SetDefault("Dir", os.ExpandEnv("$HOME/.config/restic-cronned/"))
+	viper.SetDefault("LogDir", os.ExpandEnv("$HOME/.cache/restic-cronned"))
 	viper.SetDefault("LogMaxAge", 30)
 	viper.SetDefault("LogMaxSize", 10)
-	viper.SetDefault("LogDir", os.ExpandEnv("$HOME/.cache/restic-cronned"))
 
-	viper.ReadInConfig()
-
-	if *jobpath == "" {
-		*jobpath = os.ExpandEnv(viper.GetString("JobPath"))
-	}
-	if *port == "" {
-		*port = viper.GetString("ServerPort")
+	err := viper.ReadInConfig()
+	if err != nil {
+		return err
 	}
 
-	println("JobPath: " + *jobpath)
-	println("Port: " + *port)
+	if *dirpath == "" {
+		*dirpath = os.ExpandEnv(viper.GetString("Dir"))
+	}
+
+	println("ObjectPath: " + *dirpath)
+	return nil
 }
 
 func main() {
-	loadConfig()
+	err := loadConfig()
+	if err != nil {
+		println(err.Error())
+		return
+	}
 	setupLogging()
 	startDaemon()
 }

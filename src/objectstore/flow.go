@@ -20,8 +20,36 @@ type FlowForest struct {
 	Flows map[string]*Flow
 }
 
+type BuiltFlowForrest struct {
+	Roots map[string]Triggerer
+}
+
 func (ff *FlowForest) Load(raw json.RawMessage) error {
 	return json.Unmarshal(raw, ff)
+}
+
+func (ff *FlowForest) Merge(other *FlowForest) (*FlowForest, error) {
+	new := &FlowForest{Flows: make(map[string]*Flow)}
+
+	if ff != nil {
+		for name, flow := range ff.Flows {
+			if _, ok := new.Flows[name]; ok {
+				return nil, errors.New("Duplicate names while merging: " + name)
+			}
+			new.Flows[name] = flow
+		}
+	}
+
+	if other != nil {
+		for name, flow := range other.Flows {
+			if _, ok := new.Flows[name]; ok {
+				return nil, errors.New("Duplicate names while merging: " + name)
+			}
+			new.Flows[name] = flow
+		}
+	}
+
+	return new, nil
 }
 
 func (ff *FlowForest) recBuild(tr Triggerer, store *ObjectStore, node *FlowNode, unique string) error {
@@ -77,4 +105,16 @@ func (ff *FlowForest) Build(name string, store *ObjectStore) (Triggerer, error) 
 	ff.recBuild(roottr, store, flow.Root, name+"/"+flow.Root.Name)
 
 	return roottr, nil
+}
+
+func (ff *FlowForest) BuildAll(store *ObjectStore) (*BuiltFlowForrest, error) {
+	bff := &BuiltFlowForrest{Roots: make(map[string]Triggerer)}
+	for name := range ff.Flows {
+		root, err := ff.Build(name, store)
+		if err != nil {
+			return nil, err
+		}
+		bff.Roots[name] = root
+	}
+	return bff, nil
 }
