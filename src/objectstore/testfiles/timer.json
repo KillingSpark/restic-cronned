@@ -4,11 +4,6 @@
     },
     "Spec": {
         "Name": "timer",
-        "regularTimer": "@every 10s",
-        "retryTimer": "@every 1s",
-        "maxFailedRetries": 2,
-
-        "CheckPrecondsEvery": 20,
-        "CheckPrecondsMaxTimes": 100
+        "Timer": "@every 3s"
     }
 }

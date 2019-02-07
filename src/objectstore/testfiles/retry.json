@@ -1,0 +1,10 @@
+{
+    "Kind": {
+        "Name": "Retry"
+    },
+    "Spec": {
+        "Name": "retry",
+        "Timer": "@every 1s",
+        "MaxFailedRetries": 2
+    }
+}

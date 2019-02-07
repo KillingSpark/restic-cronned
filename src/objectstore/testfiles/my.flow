@@ -41,26 +41,31 @@
                 "Name": "timer",
                 "Targets": [
                     {
-                        "Name": "oneshot",
+                        "Name": "retry",
                         "Targets": [
                             {
-                                "Name": "backup"
-                            }
-                        ]
-                    },
-                    {
-                        "Name": "backup"
-                    },
-                    {
-                        "Name": "oneshot",
-                        "Targets": [
+                                "Name": "oneshot",
+                                "Targets": [
+                                    {
+                                        "Name": "backup"
+                                    }
+                                ]
+                            },
                             {
                                 "Name": "backup"
                             },
                             {
-                                "Name": "backup"
+                                "Name": "oneshot",
+                                "Targets": [
+                                    {
+                                        "Name": "backup"
+                                    },
+                                    {
+                                        "Name": "backup"
+                                    }
+                                ]
                             }
-                        ]
+                        ] 
                     }
                 ]
             }

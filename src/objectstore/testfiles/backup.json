@@ -4,6 +4,9 @@
     },
     "Spec": {
         "Name": "backup",
-        "ResticPath": "/bin/false"
+        "ResticPath": "/bin/false",
+
+        "CheckPrecondsEvery": 20,
+        "CheckPrecondsMaxTimes": 100
     }
 }

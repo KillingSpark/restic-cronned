@@ -4,23 +4,13 @@ import (
 	"context"
 	log "github.com/Sirupsen/logrus"
 	"github.com/robfig/cron"
-	"sync"
 	"time"
-)
-
-const (
-	returnStop  ReturnValue = 0
-	returnOk    ReturnValue = 1
-	returnRetry ReturnValue = 2
 )
 
 type TimedTriggerDescription struct {
 	Name            string `Json:"Name"`
-	RegularTimer    string `json:"regularTimer"`
-	RetryTimer      string `json:"retryTimer"`
-	WaitGranularity int    `json:"waitGranularity"`
-
-	MaxFailedRetries int `json:"maxFailedRetries"`
+	Timer           string `json:"Timer"`
+	WaitGranularity int    `json:"WaitGranularity"`
 }
 
 func (d *TimedTriggerDescription) ID() string {
@@ -32,22 +22,12 @@ func (d *TimedTriggerDescription) Instantiate(unique string) (Triggerer, error) 
 	var err error
 
 	tr.Name = unique + "__" + d.Name
-	tr.MaxFailedRetries = d.MaxFailedRetries
 	tr.waitGran = time.Duration(d.WaitGranularity) * time.Millisecond
 
-	if len(d.RegularTimer) > 0 {
-		tr.regTimerSchedule, err = cron.Parse(d.RegularTimer)
-		if err != nil {
-			log.WithFields(log.Fields{"ID": d.ID, "Error": err.Error()}).Warning("Decoding error for the RegularTimer")
-			return nil, err
-		}
-	}
-	if len(d.RetryTimer) > 0 {
-		tr.retryTimerSchedule, err = cron.Parse(d.RetryTimer)
-		if err != nil {
-			log.WithFields(log.Fields{"ID": d.ID, "Error": err.Error()}).Warning("Decoding error for the RetryTimer")
-			return nil, err
-		}
+	tr.Schedule, err = cron.Parse(d.Timer)
+	if err != nil {
+		log.WithFields(log.Fields{"ID": d.ID, "Error": err.Error()}).Warning("Decoding error for the RegularTimer")
+		return nil, err
 	}
 	return tr, nil
 }
@@ -55,18 +35,10 @@ func (d *TimedTriggerDescription) Instantiate(unique string) (Triggerer, error) 
 type TimedTrigger struct {
 	Name    string
 	Targets []Triggerable
-	Lock    sync.Mutex //protects access on ToTrigger
 	Kill    chan int
 
-	regTimerSchedule   cron.Schedule
-	retryTimerSchedule cron.Schedule
-	waitGran           time.Duration
-
-	CurrentRetry     int
-	MaxFailedRetries int
-
-	CheckPrecondsEvery    int
-	CheckPrecondsMaxTimes int
+	Schedule cron.Schedule
+	waitGran time.Duration
 
 	//times set when the wait is started
 	WaitStart time.Duration
@@ -106,7 +78,7 @@ func (tt *TimedTrigger) NextTriggerWithDelay(dur time.Duration) {
 			if tt.waitGran > 0 {
 				time.Sleep(tt.waitGran)
 			} else {
-				time.Sleep(10 * time.Second)
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}
@@ -116,14 +88,15 @@ func (tt *TimedTrigger) NextTriggerWithDelay(dur time.Duration) {
 }
 
 func (tt *TimedTrigger) loop() {
-	if tt.regTimerSchedule == nil {
+	if tt.Schedule == nil {
 		//dont loop on triggers if no timer present
 		log.WithFields(log.Fields{"Trigger": tt.ID()}).Info("Skipping looping, because no timer was set")
 		return
 	}
 	//wait for first regular trigger before looping
 	log.WithFields(log.Fields{"Trigger": tt.ID()}).Info("Waiting before the first run of the job")
-	tt.NextTriggerWithDelay(tt.durationTillNextRegularTrigger())
+	tt.NextTriggerWithDelay(tt.durationTillNextTrigger())
+
 	for {
 		select {
 		case <-tt.Kill:
@@ -140,58 +113,16 @@ func (tt *TimedTrigger) loop() {
 				r = x
 			}
 		}
-		result := r
-
-		switch result {
-		case returnRetry:
-			if tt.CurrentRetry < tt.MaxFailedRetries {
-				tt.retry()
-				tt.NextTriggerWithDelay(tt.durationTillNextRetryTrigger())
-			} else {
-				tt.fail()
-				tt.NextTriggerWithDelay(tt.durationTillNextRegularTrigger())
-			}
-		case returnOk:
-			tt.success()
-			tt.NextTriggerWithDelay(tt.durationTillNextRegularTrigger())
-		case returnStop:
-			tt.fail()
-			return
-		}
+		//ignore results. just trigger next time
+		tt.NextTriggerWithDelay(tt.durationTillNextTrigger())
 	}
 }
 
-func (tt *TimedTrigger) durationTillNextRegularTrigger() time.Duration {
+func (tt *TimedTrigger) durationTillNextTrigger() time.Duration {
 	dur := time.Duration(-1)
 
-	if tt.regTimerSchedule != nil {
-		dur = tt.regTimerSchedule.Next(time.Now()).Sub(time.Now())
+	if tt.Schedule != nil {
+		dur = tt.Schedule.Next(time.Now()).Sub(time.Now())
 	}
 	return dur
-}
-
-func (tt *TimedTrigger) durationTillNextRetryTrigger() time.Duration {
-	dur := time.Duration(-1)
-
-	if tt.retryTimerSchedule != nil {
-		dur = tt.retryTimerSchedule.Next(time.Now()).Sub(time.Now())
-	}
-	return dur
-}
-
-func (tt *TimedTrigger) retry() {
-	log.WithFields(log.Fields{"Trigger": tt.ID(), "Retries": tt.CurrentRetry}).Info("Start next retry")
-	tt.CurrentRetry++
-}
-
-func (tt *TimedTrigger) fail() {
-	log.WithFields(log.Fields{"Trigger": tt.ID(), "Retries": tt.CurrentRetry}).Error("Failed. Will try again at next regular trigger")
-}
-
-func (tt *TimedTrigger) failPreconds() {
-	log.WithFields(log.Fields{"Trigger": tt.ID()}).Error("Failed Preconditions. Will try again at next regular trigger")
-}
-
-func (tt *TimedTrigger) success() {
-	log.WithFields(log.Fields{"Trigger": tt.ID(), "Retries": tt.CurrentRetry}).Info("successful")
 }
