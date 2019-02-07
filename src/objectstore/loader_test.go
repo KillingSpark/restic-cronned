@@ -52,7 +52,11 @@ func TestMyShit(t *testing.T) {
 	}
 
 	//check names/ids
-	parshot := root.(*objectstore.ParallelOneshotTrigger)
+	parshot := root.(*objectstore.OneshotTrigger)
+	if !parshot.Parallel {
+		t.Error("Didnt load Parallel attribute correctly: " + parshot.ID())
+		t.Fail()
+	}
 	for _, child := range parshot.Targets {
 		if !strings.HasSuffix(child.ID(), "___oneshot") {
 			t.Error("Didnt load middle-triggerer name correctly: " + child.ID())

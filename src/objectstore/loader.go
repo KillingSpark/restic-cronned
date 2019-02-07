@@ -44,20 +44,6 @@ func (s *ObjectStore) LoadObject(objdesc *ObjectDescription) error {
 			return err
 		}
 		s.Triggerables[desc.ID()] = desc2
-	case "Parshot":
-		desc := &ParallelOneshotTriggererDescription{}
-		err := json.Unmarshal(objdesc.Spec, desc)
-		if err != nil {
-			return err
-		}
-		s.Triggerers[desc.ID()] = desc
-
-		desc2 := &ParallelOneshotTriggerableDescription{}
-		err = json.Unmarshal(objdesc.Spec, desc2)
-		if err != nil {
-			return err
-		}
-		s.Triggerables[desc.ID()] = desc2
 	case "Job":
 		desc := &JobDescription{}
 		err := json.Unmarshal(objdesc.Spec, desc)
