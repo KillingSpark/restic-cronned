@@ -3,6 +3,7 @@ package objectstore
 import (
 	"encoding/json"
 	"errors"
+	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path"
@@ -196,6 +197,7 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 
 		if len(objdesc.Kind.Name) == 0 && len(objdesc.Spec) == 0 {
 			//skip files that are obviously no objectdescriptions
+			log.WithFields(log.Fields{"File": path.Join(dirPath, f.Name())}).Warn("Skipping file. Not a objectdescription")
 			continue
 		}
 
