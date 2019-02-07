@@ -86,44 +86,4 @@ func TestMyShit(t *testing.T) {
 			}
 		}
 	}
-
-	root, err = ff.Build("Flow2", ost)
-	if err != nil {
-		t.Error(err.Error())
-		t.Fail()
-	}
-
-	if !strings.HasSuffix(root.ID(), "__oneshot") {
-		t.Error("Didnt load triggerer name correctly: " + root.ID())
-		t.Fail()
-	}
-
-	runs = 15
-	for i := 0; i < runs; i++ {
-		root.Run(nil)
-	}
-
-	oneshot := root.(*objectstore.OneshotTrigger)
-	for _, child := range oneshot.Targets {
-		childoneshot, ok := child.(*objectstore.OneshotTrigger)
-		if ok {
-			if childoneshot.TriggerCounter != runs {
-				t.Errorf("Middletrigger didnt run right amount of times: %d", childoneshot.TriggerCounter)
-				t.Fail()
-			}
-			for _, child2 := range childoneshot.Targets {
-				job := child2.(*jobs.Job)
-				if job.TriggerCounter != runs {
-					t.Errorf("Backup %s didnt run right amount of times: %d", job.JobName, job.TriggerCounter)
-					t.Fail()
-				}
-			}
-		} else {
-			job := child.(*jobs.Job)
-			if job.TriggerCounter != runs {
-				t.Errorf("Backup %s didnt run right amount of times: %d", job.JobName, job.TriggerCounter)
-				t.Fail()
-			}
-		}
-	}
 }

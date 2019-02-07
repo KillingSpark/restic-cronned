@@ -3,6 +3,7 @@
         "Name": "Job"
     },
     "Spec": {
-        "Name": "backup"
+        "Name": "backup",
+        "ResticPath": "/bin/false"
     }
 }

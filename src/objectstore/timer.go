@@ -16,15 +16,11 @@ const (
 
 type TimedTriggerDescription struct {
 	Name            string `Json:"Name"`
-	JobToTrigger    string `json:"JobToTrigger"`
 	RegularTimer    string `json:"regularTimer"`
 	RetryTimer      string `json:"retryTimer"`
-	WaitGranularity string `json:"waitGranularity"`
+	WaitGranularity int    `json:"waitGranularity"`
 
 	MaxFailedRetries int `json:"maxFailedRetries"`
-
-	CheckPrecondsEvery    int `json:"CheckPrecondsEvery"`
-	CheckPrecondsMaxTimes int `json:"CheckPrecondsMaxTimes"`
 }
 
 func (d *TimedTriggerDescription) ID() string {
@@ -36,6 +32,8 @@ func (d *TimedTriggerDescription) Instantiate(unique string) (Triggerer, error) 
 	var err error
 
 	tr.Name = unique + "__" + d.Name
+	tr.MaxFailedRetries = d.MaxFailedRetries
+	tr.waitGran = time.Duration(d.WaitGranularity) * time.Millisecond
 
 	if len(d.RegularTimer) > 0 {
 		tr.regTimerSchedule, err = cron.Parse(d.RegularTimer)
@@ -151,6 +149,7 @@ func (tt *TimedTrigger) loop() {
 				tt.NextTriggerWithDelay(tt.durationTillNextRetryTrigger())
 			} else {
 				tt.fail()
+				tt.NextTriggerWithDelay(tt.durationTillNextRegularTrigger())
 			}
 		case returnOk:
 			tt.success()
