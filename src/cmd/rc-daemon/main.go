@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"github.com/killingspark/restic-cronned/src/jobs"
 	"os"
 	"os/signal"
 	"path"
@@ -9,6 +12,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/killingspark/restic-cronned/src/objectstore"
+	"github.com/killingspark/restic-cronned/src/triggers"
 	"github.com/rshmelev/lumberjack"
 	"github.com/spf13/viper"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -30,8 +34,65 @@ func setupLogging() {
 	})
 }
 
+func registerTypes(s *objectstore.ObjectStore) {
+	s.RegisterTriggerableType("Job", func(raw json.RawMessage) (objectstore.TriggerableDescription, error) {
+		desc := &jobs.JobDescription{}
+		err := json.Unmarshal(raw, desc)
+		if err != nil {
+			return nil, err
+		}
+		return desc, nil
+	})
+
+	s.RegisterTriggerableType("Oneshot", func(raw json.RawMessage) (objectstore.TriggerableDescription, error) {
+		desc := &triggers.OneshotTriggerableDescription{}
+		err := json.Unmarshal(raw, desc)
+		if err != nil {
+			return nil, err
+		}
+		return desc, nil
+	})
+	s.RegisterTriggerableType("Retry", func(raw json.RawMessage) (objectstore.TriggerableDescription, error) {
+		desc := &triggers.RetryTriggerableDescription{}
+		err := json.Unmarshal(raw, desc)
+		if err != nil {
+			return nil, err
+		}
+		return desc, nil
+	})
+
+	s.RegisterTriggererType("Oneshot", func(raw json.RawMessage) (objectstore.TriggererDescription, error) {
+		desc := &triggers.OneshotTriggererDescription{}
+		err := json.Unmarshal(raw, desc)
+		if err != nil {
+			return nil, err
+		}
+		return desc, nil
+	})
+	s.RegisterTriggererType("Retry", func(raw json.RawMessage) (objectstore.TriggererDescription, error) {
+		desc := &triggers.RetryTriggererDescription{}
+		err := json.Unmarshal(raw, desc)
+		if err != nil {
+			return nil, err
+		}
+		return desc, nil
+	})
+
+	s.RegisterTriggererType("Timer", func(raw json.RawMessage) (objectstore.TriggererDescription, error) {
+		desc := &triggers.TimedTriggerDescription{}
+		err := json.Unmarshal(raw, desc)
+		if err != nil {
+			return nil, err
+		}
+		return desc, nil
+	})
+}
+
 func startDaemon() {
-	objs := objectstore.ObjectStore{}
+	objs := objectstore.NewObjectStore()
+
+	registerTypes(objs)
+
 	err := objs.LoadAllObjects(*dirpath)
 	if err != nil {
 		println(err.Error())
@@ -44,7 +105,7 @@ func startDaemon() {
 		return
 	}
 
-	builtff, err := ff.BuildAll(&objs)
+	builtff, err := ff.BuildAll(objs)
 	if err != nil {
 		println(err.Error())
 		return
@@ -52,13 +113,16 @@ func startDaemon() {
 
 	wg := sync.WaitGroup{}
 
+	log.Info("Starting all flows")
+
 	for n := range builtff.Roots {
 		name := n
 		root := builtff.Roots[name]
 		wg.Add(1)
 		go func() {
 			log.WithFields(log.Fields{"Flow": name}).Info("Starting flow")
-			root.Run(nil)
+			ctx := context.Background()
+			root.Run(&ctx)
 			wg.Done()
 		}()
 	}

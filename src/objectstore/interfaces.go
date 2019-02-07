@@ -2,10 +2,9 @@ package objectstore
 
 import (
 	"context"
-	"github.com/killingspark/restic-cronned/src/jobs"
 )
 
-type ReturnValue = jobs.JobReturn
+type ReturnValue int
 
 //ugly private interfaces. Needed because go doesnt allow overlapping of interfaces
 type __Triggerable interface {
@@ -13,7 +12,7 @@ type __Triggerable interface {
 }
 type __Triggerer interface {
 	AddTarget(Triggerable) error
-	Run(context.Context) error
+	Run(*context.Context) error
 }
 type __IDable interface {
 	ID() string

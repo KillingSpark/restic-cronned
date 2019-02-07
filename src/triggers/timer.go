@@ -1,8 +1,9 @@
-package objectstore
+package triggers
 
 import (
 	"context"
 	log "github.com/Sirupsen/logrus"
+	"github.com/killingspark/restic-cronned/src/objectstore"
 	"github.com/robfig/cron"
 	"time"
 )
@@ -17,7 +18,7 @@ func (d *TimedTriggerDescription) ID() string {
 	return d.Name
 }
 
-func (d *TimedTriggerDescription) Instantiate(unique string) (Triggerer, error) {
+func (d *TimedTriggerDescription) Instantiate(unique string) (objectstore.Triggerer, error) {
 	tr := &TimedTrigger{}
 	var err error
 
@@ -34,7 +35,7 @@ func (d *TimedTriggerDescription) Instantiate(unique string) (Triggerer, error) 
 
 type TimedTrigger struct {
 	Name    string
-	Targets []Triggerable
+	Targets []objectstore.Triggerable
 	Kill    chan int
 
 	Schedule cron.Schedule
@@ -49,12 +50,12 @@ func (tt *TimedTrigger) ID() string {
 	return tt.Name
 }
 
-func (tt *TimedTrigger) AddTarget(ta Triggerable) error {
+func (tt *TimedTrigger) AddTarget(ta objectstore.Triggerable) error {
 	tt.Targets = append(tt.Targets, ta)
 	return nil
 }
 
-func (tt *TimedTrigger) Run(ctx context.Context) error {
+func (tt *TimedTrigger) Run(ctx *context.Context) error {
 	tt.loop()
 	return nil
 }
@@ -107,7 +108,7 @@ func (tt *TimedTrigger) loop() {
 
 		log.WithFields(log.Fields{"Trigger": tt.ID()}).Info("Waiting finished an no kill received")
 
-		var r ReturnValue
+		var r objectstore.ReturnValue
 		for _, t := range tt.Targets {
 			if x := t.Trigger(nil); x > r {
 				r = x

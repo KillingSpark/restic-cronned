@@ -1,16 +1,17 @@
-package objectstore
+package triggers
 
 import (
 	"context"
 	log "github.com/Sirupsen/logrus"
+	"github.com/killingspark/restic-cronned/src/objectstore"
 	"github.com/robfig/cron"
 	"time"
 )
 
 const (
-	returnStop  ReturnValue = 0
-	returnOk    ReturnValue = 1
-	returnRetry ReturnValue = 2
+	returnStop  objectstore.ReturnValue = 0
+	returnOk    objectstore.ReturnValue = 1
+	returnRetry objectstore.ReturnValue = 2
 )
 
 type RetryTriggererDescription struct {
@@ -27,7 +28,7 @@ func (d *RetryTriggererDescription) ID() string {
 	return d.Name
 }
 
-func (d *RetryTriggererDescription) Instantiate(unique string) (Triggerer, error) {
+func (d *RetryTriggererDescription) Instantiate(unique string) (objectstore.Triggerer, error) {
 	tr := &RetryTrigger{}
 	var err error
 
@@ -47,7 +48,7 @@ func (d *RetryTriggerableDescription) ID() string {
 	return d.Name
 }
 
-func (d *RetryTriggerableDescription) Instantiate(unique string) (Triggerable, error) {
+func (d *RetryTriggerableDescription) Instantiate(unique string) (objectstore.Triggerable, error) {
 	tr := &RetryTrigger{}
 	var err error
 
@@ -65,7 +66,7 @@ func (d *RetryTriggerableDescription) Instantiate(unique string) (Triggerable, e
 
 type RetryTrigger struct {
 	Name    string
-	Targets []Triggerable
+	Targets []objectstore.Triggerable
 
 	Schedule cron.Schedule
 	waitGran time.Duration
@@ -78,17 +79,17 @@ func (tt *RetryTrigger) ID() string {
 	return tt.Name
 }
 
-func (tt *RetryTrigger) AddTarget(ta Triggerable) error {
+func (tt *RetryTrigger) AddTarget(ta objectstore.Triggerable) error {
 	tt.Targets = append(tt.Targets, ta)
 	return nil
 }
 
-func (tt *RetryTrigger) Run(ctx context.Context) error {
+func (tt *RetryTrigger) Run(ctx *context.Context) error {
 	tt.loop()
 	return nil
 }
 
-func (tt *RetryTrigger) Trigger(ctx *context.Context) ReturnValue {
+func (tt *RetryTrigger) Trigger(ctx *context.Context) objectstore.ReturnValue {
 	return tt.loop()
 }
 
@@ -116,7 +117,7 @@ func (tt *RetryTrigger) NextTriggerWithDelay(dur time.Duration) {
 	}
 }
 
-func (tt *RetryTrigger) loop() ReturnValue {
+func (tt *RetryTrigger) loop() objectstore.ReturnValue {
 	tt.CurrentRetry = 0
 
 	if tt.Schedule == nil {
@@ -128,7 +129,7 @@ func (tt *RetryTrigger) loop() ReturnValue {
 		log.WithFields(log.Fields{"Trigger": tt.ID(), "Retry": tt.CurrentRetry}).Info("Starting try")
 
 		//TODO result resolution
-		var r ReturnValue
+		var r objectstore.ReturnValue
 		for _, t := range tt.Targets {
 			if x := t.Trigger(nil); x > r {
 				r = x

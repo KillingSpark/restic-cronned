@@ -18,56 +18,58 @@ type ObjectDescription struct {
 }
 
 type ObjectStore struct {
-	Triggerers   map[string]TriggererDescription
-	Triggerables map[string]TriggerableDescription
+	Triggerers           map[string]TriggererDescription
+	registeredTriggerers map[string]TriggererRegisterFunc
+
+	Triggerables           map[string]TriggerableDescription
+	registeredTriggerables map[string]TriggerableRegisterFunc
+}
+
+type TriggererRegisterFunc func(json.RawMessage) (TriggererDescription, error)
+type TriggerableRegisterFunc func(json.RawMessage) (TriggerableDescription, error)
+
+func NewObjectStore() *ObjectStore {
+	s := &ObjectStore{}
+	s.registeredTriggerables = make(map[string]TriggerableRegisterFunc)
+	s.registeredTriggerers = make(map[string]TriggererRegisterFunc)
+	return s
+}
+
+func (s *ObjectStore) RegisterTriggererType(name string, f TriggererRegisterFunc) error {
+	if _, ok := s.registeredTriggerers[name]; ok {
+		return errors.New("Type already registered as triggerer: " + name)
+	}
+	s.registeredTriggerers[name] = f
+	return nil
+}
+func (s *ObjectStore) RegisterTriggerableType(name string, f TriggerableRegisterFunc) error {
+	if _, ok := s.registeredTriggerables[name]; ok {
+		return errors.New("Type already registered as triggerable: " + name)
+	}
+	s.registeredTriggerables[name] = f
+	return nil
 }
 
 func (s *ObjectStore) LoadObject(objdesc *ObjectDescription) error {
-	switch objdesc.Kind.Name {
-	case "Timer":
-		desc := &TimedTriggerDescription{}
-		err := json.Unmarshal(objdesc.Spec, desc)
-		if err != nil {
-			return err
-		}
-		s.Triggerers[desc.ID()] = desc
-	case "Retry":
-		desc := &RetryTriggererDescription{}
-		err := json.Unmarshal(objdesc.Spec, desc)
-		if err != nil {
-			return err
-		}
-		s.Triggerers[desc.ID()] = desc
+	triggabledesc, taok := s.registeredTriggerables[objdesc.Kind.Name]
+	triggerdesc, trok := s.registeredTriggerers[objdesc.Kind.Name]
 
-		desc2 := &RetryTriggerableDescription{}
-		err = json.Unmarshal(objdesc.Spec, desc2)
-		if err != nil {
-			return err
-		}
-		s.Triggerables[desc2.ID()] = desc2
-
-	case "Oneshot":
-		desc := &OneshotTriggererDescription{}
-		err := json.Unmarshal(objdesc.Spec, desc)
-		if err != nil {
-			return err
-		}
-		s.Triggerers[desc.ID()] = desc
-
-		desc2 := &OneshotTriggerableDescription{}
-		err = json.Unmarshal(objdesc.Spec, desc2)
-		if err != nil {
-			return err
-		}
-		s.Triggerables[desc2.ID()] = desc2
-	case "Job":
-		desc := &JobDescription{}
-		err := json.Unmarshal(objdesc.Spec, desc)
+	if taok {
+		desc, err := triggabledesc(objdesc.Spec)
 		if err != nil {
 			return err
 		}
 		s.Triggerables[desc.ID()] = desc
-	default:
+	}
+	if trok {
+		desc, err := triggerdesc(objdesc.Spec)
+		if err != nil {
+			return err
+		}
+		s.Triggerers[desc.ID()] = desc
+	}
+
+	if !taok && !trok {
 		panic("Cant handle kind: " + objdesc.Kind.Name)
 	}
 	return nil

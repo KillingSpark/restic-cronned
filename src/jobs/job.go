@@ -4,6 +4,7 @@ package jobs
 import (
 	"bytes"
 	"context"
+	"github.com/killingspark/restic-cronned/src/objectstore"
 	"io"
 	"os"
 	"os/exec"
@@ -65,7 +66,7 @@ func newJob() *Job {
 }
 
 //JobReturn status returns from jobs
-type JobReturn int
+type JobReturn = objectstore.ReturnValue
 
 const (
 	returnStop  JobReturn = 0
