@@ -44,7 +44,11 @@ func startDaemon() {
 		println(err.Error())
 		return
 	}
-	ff.Load(marshflow)
+	err = ff.Load(marshflow)
+	if err != nil {
+		println(err.Error())
+		return
+	}
 
 	wg := sync.WaitGroup{}
 
