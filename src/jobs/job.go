@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	keyring "github.com/zalando/go-keyring"
@@ -19,6 +20,9 @@ import (
 //Job represents one job that will be run in a Queue
 type Job struct {
 	lock sync.Mutex //locks the run method so the job can only be run by one trigger at a time
+
+	CheckPrecondsMaxTimes   int
+	CheckPrecondsEveryMilli int
 
 	//the progress of the running restic command. not working.
 	Progress float64 `json:"progress"`
@@ -126,6 +130,10 @@ func (job *Job) run() JobReturn {
 	job.lock.Lock()
 	defer job.lock.Unlock()
 
+	if !job.waitPreconds() {
+		return returnRetry
+	}
+
 	var cmd *exec.Cmd
 	if len(job.ResticPath) > 0 {
 		cmd = exec.Command(job.ResticPath, job.ResticArguments...)
@@ -170,4 +178,18 @@ func (job *Job) run() JobReturn {
 	default:
 		return returnRetry //not fine but retryable
 	}
+}
+
+func (job *Job) waitPreconds() bool {
+	if job.CheckPrecondsMaxTimes > 0 {
+		preconds := false
+		for i := 0; !preconds && i < job.CheckPrecondsMaxTimes; i++ {
+			preconds = job.CheckPreconditions()
+			if !preconds {
+				time.Sleep(time.Duration(job.CheckPrecondsEveryMilli) * time.Millisecond)
+			}
+		}
+		return preconds
+	}
+	return true
 }

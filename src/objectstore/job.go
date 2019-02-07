@@ -8,11 +8,14 @@ type JobDescription struct {
 	JobName  string   `json:"Name"`
 	NextJobs []string `json:"NextJobs"`
 
-	Username        string                `json:"Username"`
-	Service         string                `json:"Service"`
-	ResticPath      string                `json:"ResticPath"`
-	ResticArguments []string              `json:"ResticArguments"`
-	Preconditions   jobs.JobPreconditions `json:"Preconditions"`
+	Username        string   `json:"Username"`
+	Service         string   `json:"Service"`
+	ResticPath      string   `json:"ResticPath"`
+	ResticArguments []string `json:"ResticArguments"`
+
+	CheckPrecondsMaxTimes   int                   `json:"CheckPrecondsMaxTimes"`
+	CheckPrecondsEveryMilli int                   `json:"CheckPrecondsEveryMilli"`
+	Preconditions           jobs.JobPreconditions `json:"Preconditions"`
 }
 
 func (jd *JobDescription) ID() string {
@@ -26,7 +29,10 @@ func (jd *JobDescription) Instantiate(unique string) (Triggerable, error) {
 	job.ResticArguments = jd.ResticArguments
 	job.Username = jd.Username
 	job.Service = jd.Service
+
 	job.Preconditions = jd.Preconditions
+	job.CheckPrecondsMaxTimes = jd.CheckPrecondsMaxTimes
+	job.CheckPrecondsEveryMilli = jd.CheckPrecondsEveryMilli
 	job.RetrieveAndStorePassword()
 
 	return job, nil
