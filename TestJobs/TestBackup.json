@@ -8,7 +8,7 @@
     "Service": "test",
     "ResticArguments": ["-r", "./testrepo", "backup", "./TestJobs"],
 
-    "CheckPrecondsEvery": 20,
+    "CheckPrecondsEvery": 20000,
     "CheckPrecondsMaxTimes": 100,
     "Preconditions": {
         "HostsMustRoute": ["localhost"],
