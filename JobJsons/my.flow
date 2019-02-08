@@ -1,0 +1,39 @@
+{
+    "Flows":{
+        "BackupFlow": {
+            "Name": "BackupFlow",
+            "Root": {
+                "Name": "timer",
+                "Targets": [
+                    {
+                        "Name": "retry",
+                        "Targets": [
+                            {
+                                "Name": "oneshot",
+                                "Targets": [
+                                    {
+                                        "Name": "backup"
+                                    }
+                                ]
+                            },
+                            {
+                                "Name": "backup"
+                            },
+                            {
+                                "Name": "oneshot",
+                                "Targets": [
+                                    {
+                                        "Name": "backup"
+                                    },
+                                    {
+                                        "Name": "backup"
+                                    }
+                                ]
+                            }
+                        ] 
+                    }
+                ]
+            }
+        }
+    }
+}

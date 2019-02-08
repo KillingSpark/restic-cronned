@@ -1,6 +1,0 @@
-{
-    "JobName": "ExampleForget",
-    "Username":"Apache",
-    "Service": "restic-repo1",
-    "ResticArguments": ["-r", "/tmp/backup", "forget", "--keep-last", "30"]
-}

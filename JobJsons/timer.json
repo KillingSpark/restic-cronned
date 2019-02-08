@@ -1,0 +1,9 @@
+{
+    "Kind": {
+        "Name": "Timer"
+    },
+    "Spec": {
+        "Name": "timer",
+        "Timer": "@every 3s"
+    }
+}
