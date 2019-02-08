@@ -6,6 +6,8 @@ They can trigger all targets in sequence or parallel. They will in the future su
 results of the targets of the oneshot to pass back to the triggerer that triggered the oneshot.
 
 ## Config
+
+```
 {
     "Kind": {
         "Name": "Oneshot"
@@ -15,3 +17,4 @@ results of the targets of the oneshot to pass back to the triggerer that trigger
         "Parallel": true
     }
 }
+```

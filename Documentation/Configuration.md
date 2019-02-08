@@ -19,6 +19,7 @@ and load all .flow files into one big flow collection.
 ## Objects
 Jobs/Timers/... are objects which are generally configured like this:
 
+```
 {
     "Kind": {
         "Name": "TYPENAME"
@@ -27,5 +28,6 @@ Jobs/Timers/... are objects which are generally configured like this:
        "TYPE":"SPECIFIC"
     }
 }
+```
 
 See related files for the concrete configs.

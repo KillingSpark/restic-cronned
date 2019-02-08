@@ -12,6 +12,8 @@ Preconditions represent conditions that have to be met before starting a job. Cu
 There are plans to add support for udev checks.
 
 ## Config
+
+```
 {
     "Kind": {
         "Name": "Job"
@@ -28,3 +30,4 @@ There are plans to add support for udev checks.
             "HostsMustConnect": [{"Host": "google.com", "Port": 80}]
     }
 }
+```

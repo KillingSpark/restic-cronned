@@ -4,6 +4,8 @@ They work similiarly to a timer, but they stop repeating as soon as the target(s
 
 
 ## Config
+
+```
 {
     "Kind": {
         "Name": "Retry"
@@ -14,3 +16,4 @@ They work similiarly to a timer, but they stop repeating as soon as the target(s
         "MaxFailedRetries": 2
     }
 }
+```

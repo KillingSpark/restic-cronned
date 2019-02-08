@@ -7,6 +7,8 @@ Think a tree where on the root a triggerer triggers all children which propagate
 ## Config
 The Toplevel "Flows" can hold any amount of different flows. You can also have multiple .flow files, they will be merged into one 
 big flow collection internally (as long as the names stay unique).
+
+```
 {
     "Flows":{
         "BackupFlow": {
@@ -46,3 +48,4 @@ big flow collection internally (as long as the names stay unique).
         }
     }
 }
+```
