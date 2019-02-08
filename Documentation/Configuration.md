@@ -12,6 +12,10 @@ Configuration is done in the file config.json.
 * "LogDir" tells restic-cronned where to write logs to
 * "Log*" are parameters that are passed to lumberjack which makes to logs
 
+## Loading
+Restic-cronned will descend into directories in "Dir" and also follow symlinks. It will load all .json files if they match the object layout
+and load all .flow files into one big flow collection.
+
 ## Objects
 Jobs/Timers/... are objects which are generally configured like this:
 
