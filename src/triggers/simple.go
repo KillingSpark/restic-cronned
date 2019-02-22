@@ -8,19 +8,19 @@ import (
 	"sync"
 )
 
-type OneshotTriggererDescription struct {
+type SimpleTriggererDescription struct {
 	Name     string `Json:"Name"`
 	Parallel bool   `Json:"Parallel"`
 }
 
-type OneshotTriggerableDescription OneshotTriggererDescription
+type SimpleTriggerableDescription SimpleTriggererDescription
 
-func (d *OneshotTriggererDescription) ID() string {
+func (d *SimpleTriggererDescription) ID() string {
 	return d.Name
 }
 
-func (d *OneshotTriggererDescription) Instantiate(unique string) (objectstore.Triggerer, error) {
-	tr := &OneshotTrigger{}
+func (d *SimpleTriggererDescription) Instantiate(unique string) (objectstore.Triggerer, error) {
+	tr := &SimpleTrigger{}
 
 	tr.Name = unique + "__" + d.Name
 	tr.Parallel = d.Parallel
@@ -28,12 +28,12 @@ func (d *OneshotTriggererDescription) Instantiate(unique string) (objectstore.Tr
 	return tr, nil
 }
 
-func (d *OneshotTriggerableDescription) ID() string {
+func (d *SimpleTriggerableDescription) ID() string {
 	return d.Name
 }
 
-func (d *OneshotTriggerableDescription) Instantiate(unique string) (objectstore.Triggerable, error) {
-	tr := &OneshotTrigger{}
+func (d *SimpleTriggerableDescription) Instantiate(unique string) (objectstore.Triggerable, error) {
+	tr := &SimpleTrigger{}
 
 	tr.Name = unique + "__" + d.Name
 	tr.Parallel = d.Parallel
@@ -41,7 +41,7 @@ func (d *OneshotTriggerableDescription) Instantiate(unique string) (objectstore.
 	return tr, nil
 }
 
-type OneshotTrigger struct {
+type SimpleTrigger struct {
 	Name     string
 	Parallel bool
 
@@ -49,24 +49,21 @@ type OneshotTrigger struct {
 	TriggerCounter int
 }
 
-func (tt *OneshotTrigger) ID() string {
+func (tt *SimpleTrigger) ID() string {
 	return tt.Name
 }
 
-func (tt *OneshotTrigger) AddTarget(ta objectstore.Triggerable) error {
+func (tt *SimpleTrigger) AddTarget(ta objectstore.Triggerable) error {
 	tt.Targets = append(tt.Targets, ta)
 	return nil
 }
 
-func (tt *OneshotTrigger) Run(ctx *context.Context) error {
-	for _, t := range tt.Targets {
-		t.Trigger(ctx)
-	}
+func (tt *SimpleTrigger) Run(ctx context.Context) error {
+	tt.Trigger(ctx)
 	return nil
 }
 
-func (tt *OneshotTrigger) triggerSeq(ctx *context.Context) jobs.JobReturn {
-	tt.TriggerCounter++
+func (tt *SimpleTrigger) triggerSeq(ctx context.Context) jobs.JobReturn {
 	var r objectstore.ReturnValue
 	for _, t := range tt.Targets {
 		if x := t.Trigger(ctx); x > r {
@@ -76,8 +73,7 @@ func (tt *OneshotTrigger) triggerSeq(ctx *context.Context) jobs.JobReturn {
 	return r
 }
 
-func (tt *OneshotTrigger) triggerPar(ctx *context.Context) jobs.JobReturn {
-	tt.TriggerCounter++
+func (tt *SimpleTrigger) triggerPar(ctx context.Context) jobs.JobReturn {
 	res := make([]objectstore.ReturnValue, len(tt.Targets))
 	wg := sync.WaitGroup{}
 	for i, t := range tt.Targets {
@@ -102,7 +98,8 @@ func (tt *OneshotTrigger) triggerPar(ctx *context.Context) jobs.JobReturn {
 	return r
 }
 
-func (tt *OneshotTrigger) Trigger(ctx *context.Context) jobs.JobReturn {
+func (tt *SimpleTrigger) Trigger(ctx context.Context) jobs.JobReturn {
+	tt.TriggerCounter++
 	if tt.Parallel {
 		return tt.triggerPar(ctx)
 	} else {

@@ -3,10 +3,10 @@
         "Flow1": {
             "Name": "Flow1",
             "Root": {
-                "Name": "parshot",
+                "Name": "parsimple",
                 "Targets": [
                     {
-                        "Name": "oneshot",
+                        "Name": "simple",
                         "Targets": [
                             {
                                 "Name": "backup"
@@ -14,7 +14,7 @@
                         ]
                     },
                      {
-                        "Name": "oneshot",
+                        "Name": "simple",
                         "Targets": [
                             {
                                 "Name": "backup"
@@ -22,7 +22,7 @@
                         ]
                     },
                      {
-                        "Name": "oneshot",
+                        "Name": "simple",
                         "Targets": [
                             {
                                 "Name": "backup"
@@ -44,7 +44,7 @@
                         "Name": "retry",
                         "Targets": [
                             {
-                                "Name": "oneshot",
+                                "Name": "simple",
                                 "Targets": [
                                     {
                                         "Name": "backup"
@@ -55,7 +55,7 @@
                                 "Name": "backup"
                             },
                             {
-                                "Name": "oneshot",
+                                "Name": "simple",
                                 "Targets": [
                                     {
                                         "Name": "backup"

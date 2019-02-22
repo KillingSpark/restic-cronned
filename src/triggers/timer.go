@@ -9,20 +9,22 @@ import (
 )
 
 type TimedTriggerDescription struct {
-	Name            string `Json:"Name"`
+	SimpleTriggererDescription
+
 	Timer           string `json:"Timer"`
 	WaitGranularity int    `json:"WaitGranularity"`
-}
-
-func (d *TimedTriggerDescription) ID() string {
-	return d.Name
 }
 
 func (d *TimedTriggerDescription) Instantiate(unique string) (objectstore.Triggerer, error) {
 	tr := &TimedTrigger{}
 	var err error
 
-	tr.Name = unique + "__" + d.Name
+	simple, err := d.SimpleTriggererDescription.Instantiate(unique)
+	if err != nil {
+		return nil, err
+	}
+	tr.SimpleTrigger = *(simple.(*SimpleTrigger))
+
 	tr.waitGran = time.Duration(d.WaitGranularity) * time.Millisecond
 
 	tr.Schedule, err = cron.Parse(d.Timer)
@@ -34,9 +36,7 @@ func (d *TimedTriggerDescription) Instantiate(unique string) (objectstore.Trigge
 }
 
 type TimedTrigger struct {
-	Name    string
-	Targets []objectstore.Triggerable
-	Kill    chan int
+	SimpleTrigger
 
 	Schedule cron.Schedule
 	waitGran time.Duration
@@ -46,17 +46,8 @@ type TimedTrigger struct {
 	WaitEnd   time.Duration
 }
 
-func (tt *TimedTrigger) ID() string {
-	return tt.Name
-}
-
-func (tt *TimedTrigger) AddTarget(ta objectstore.Triggerable) error {
-	tt.Targets = append(tt.Targets, ta)
-	return nil
-}
-
-func (tt *TimedTrigger) Run(ctx *context.Context) error {
-	tt.loop()
+func (tt *TimedTrigger) Run(ctx context.Context) error {
+	tt.loop(ctx)
 	return nil
 }
 
@@ -88,7 +79,7 @@ func (tt *TimedTrigger) NextTriggerWithDelay(dur time.Duration) {
 	}
 }
 
-func (tt *TimedTrigger) loop() {
+func (tt *TimedTrigger) loop(ctx context.Context) {
 	if tt.Schedule == nil {
 		//dont loop on triggers if no timer present
 		log.WithFields(log.Fields{"Trigger": tt.ID()}).Info("Skipping looping, because no timer was set")
@@ -100,8 +91,7 @@ func (tt *TimedTrigger) loop() {
 
 	for {
 		select {
-		case <-tt.Kill:
-			tt.Kill <- 0
+		case <-ctx.Done():
 			return
 		default: //proceed
 		}

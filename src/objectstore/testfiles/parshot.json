@@ -1,9 +1,9 @@
 {
     "Kind": {
-        "Name": "Oneshot"
+        "Name": "Simple"
     },
     "Spec": {
-        "Name": "parshot",
+        "Name": "parsimple",
         "Parallel": true
     }
 }

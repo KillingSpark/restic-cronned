@@ -164,11 +164,11 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 		if f.Mode()&os.ModeSymlink != 0 {
 			trgt, err := os.Readlink(path.Join(dirPath, f.Name()))
 			if err != nil {
-				return err
+				return errors.New(f.Name() + ":" + err.Error())
 			}
 			f, err = os.Stat(trgt)
 			if err != nil {
-				return err
+				return errors.New(f.Name() + ":" + err.Error())
 			}
 		}
 
@@ -177,7 +177,7 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 			//imposing a fixed directory structure
 			err := s.LoadAllObjects(path.Join(dirPath, f.Name()))
 			if err != nil {
-				return err
+				return errors.New(f.Name() + ":" + err.Error())
 			}
 			continue
 		}
@@ -194,7 +194,7 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 		jsonParser := json.NewDecoder(file)
 		err = jsonParser.Decode(objdesc)
 		if err != nil {
-			return err
+			return errors.New(f.Name() + ":" + err.Error())
 		}
 
 		if len(objdesc.Kind.Name) == 0 && len(objdesc.Spec) == 0 {
@@ -206,7 +206,7 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 		//tries to find a probider and adds it to the correct map if found
 		err = s.LoadObject(objdesc)
 		if err != nil {
-			return err
+			return errors.New(f.Name() + ":" + err.Error())
 		}
 	}
 

@@ -42,7 +42,7 @@ type Job struct {
 	TriggerCounter int
 }
 
-func (job *Job) Trigger(ctx *context.Context) JobReturn {
+func (job *Job) Trigger(ctx context.Context) JobReturn {
 	job.TriggerCounter++
 	return job.run()
 }

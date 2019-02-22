@@ -1,8 +1,8 @@
 {
     "Kind": {
-        "Name": "Oneshot"
+        "Name": "Simple"
     },
     "Spec": {
-        "Name": "oneshot"
+        "Name": "simple"
     }
 }

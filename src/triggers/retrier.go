@@ -15,7 +15,8 @@ const (
 )
 
 type RetryTriggererDescription struct {
-	Name            string `Json:"Name"`
+	SimpleTriggererDescription
+
 	RetryTimer      string `json:"Timer"`
 	WaitGranularity int    `json:"WaitGranularity"`
 
@@ -24,15 +25,17 @@ type RetryTriggererDescription struct {
 
 type RetryTriggerableDescription RetryTriggererDescription
 
-func (d *RetryTriggererDescription) ID() string {
-	return d.Name
-}
-
 func (d *RetryTriggererDescription) Instantiate(unique string) (objectstore.Triggerer, error) {
 	tr := &RetryTrigger{}
 	var err error
 
-	tr.Name = unique + "__" + d.Name
+	simple, err := d.SimpleTriggererDescription.Instantiate(unique)
+	if err != nil {
+		return nil, err
+	}
+
+	tr.SimpleTrigger = *(simple.(*SimpleTrigger))
+
 	tr.MaxFailedRetries = d.MaxFailedRetries
 	tr.waitGran = time.Duration(d.WaitGranularity) * time.Millisecond
 
@@ -44,15 +47,17 @@ func (d *RetryTriggererDescription) Instantiate(unique string) (objectstore.Trig
 	return tr, nil
 }
 
-func (d *RetryTriggerableDescription) ID() string {
-	return d.Name
-}
-
 func (d *RetryTriggerableDescription) Instantiate(unique string) (objectstore.Triggerable, error) {
 	tr := &RetryTrigger{}
 	var err error
 
-	tr.Name = unique + "__" + d.Name
+	simple, err := d.SimpleTriggererDescription.Instantiate(unique)
+	if err != nil {
+		return nil, err
+	}
+
+	tr.SimpleTrigger = *(simple.(*SimpleTrigger))
+
 	tr.MaxFailedRetries = d.MaxFailedRetries
 	tr.waitGran = time.Duration(d.WaitGranularity) * time.Millisecond
 
@@ -65,8 +70,7 @@ func (d *RetryTriggerableDescription) Instantiate(unique string) (objectstore.Tr
 }
 
 type RetryTrigger struct {
-	Name    string
-	Targets []objectstore.Triggerable
+	SimpleTrigger
 
 	Schedule cron.Schedule
 	waitGran time.Duration
@@ -75,21 +79,12 @@ type RetryTrigger struct {
 	MaxFailedRetries int
 }
 
-func (tt *RetryTrigger) ID() string {
-	return tt.Name
-}
-
-func (tt *RetryTrigger) AddTarget(ta objectstore.Triggerable) error {
-	tt.Targets = append(tt.Targets, ta)
+func (tt *RetryTrigger) Run(ctx context.Context) error {
+	tt.Trigger(ctx)
 	return nil
 }
 
-func (tt *RetryTrigger) Run(ctx *context.Context) error {
-	tt.loop()
-	return nil
-}
-
-func (tt *RetryTrigger) Trigger(ctx *context.Context) objectstore.ReturnValue {
+func (tt *RetryTrigger) Trigger(ctx context.Context) objectstore.ReturnValue {
 	return tt.loop()
 }
 

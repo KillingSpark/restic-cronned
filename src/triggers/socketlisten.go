@@ -3,6 +3,7 @@ package triggers
 import (
 	"bufio"
 	"context"
+	"errors"
 	"github.com/killingspark/restic-cronned/src/objectstore"
 	"net"
 )
@@ -41,10 +42,10 @@ func (tt *UnixTriggerer) AddTarget(ta objectstore.Triggerable) error {
 	return nil
 }
 
-func (tt *UnixTriggerer) Run(ctx *context.Context) error {
+func (tt *UnixTriggerer) Run(ctx context.Context) error {
 	conn, err := net.Dial("unix", tt.SocketPath)
 	if err != nil {
-		return err
+		return errors.New("Couldnt dial socket: " + err.Error())
 	}
 	br := bufio.NewReader(conn)
 	for {

@@ -1,10 +1,8 @@
 package jobs
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
-	"path"
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
@@ -50,13 +48,6 @@ func (pp *PathPrecond) CheckCondition() bool {
 		return false
 	}
 	if stat.IsDir() {
-		list, err := ioutil.ReadDir(path.Join(string(*pp)))
-		if err != nil {
-			return false
-		}
-		if len(list) <= 0 {
-			return false
-		}
 		return true
 	}
 	return false

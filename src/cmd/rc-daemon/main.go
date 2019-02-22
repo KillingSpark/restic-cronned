@@ -44,8 +44,8 @@ func registerTypes(s *objectstore.ObjectStore) {
 		return desc, nil
 	})
 
-	s.RegisterTriggerableType("Oneshot", func(raw json.RawMessage) (objectstore.TriggerableDescription, error) {
-		desc := &triggers.OneshotTriggerableDescription{}
+	s.RegisterTriggerableType("Simple", func(raw json.RawMessage) (objectstore.TriggerableDescription, error) {
+		desc := &triggers.SimpleTriggerableDescription{}
 		err := json.Unmarshal(raw, desc)
 		if err != nil {
 			return nil, err
@@ -61,8 +61,8 @@ func registerTypes(s *objectstore.ObjectStore) {
 		return desc, nil
 	})
 
-	s.RegisterTriggererType("Oneshot", func(raw json.RawMessage) (objectstore.TriggererDescription, error) {
-		desc := &triggers.OneshotTriggererDescription{}
+	s.RegisterTriggererType("Simple", func(raw json.RawMessage) (objectstore.TriggererDescription, error) {
+		desc := &triggers.SimpleTriggererDescription{}
 		err := json.Unmarshal(raw, desc)
 		if err != nil {
 			return nil, err
@@ -121,8 +121,7 @@ func startDaemon() {
 		wg.Add(1)
 		go func() {
 			log.WithFields(log.Fields{"Flow": name}).Info("Starting flow")
-			ctx := context.Background()
-			root.Run(&ctx)
+			root.Run(context.Background())
 			wg.Done()
 		}()
 	}
