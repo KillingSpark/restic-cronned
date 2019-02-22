@@ -109,6 +109,21 @@ func LoadAllFlowForrests(dirPath string) (*FlowForest, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			if f.IsDir() {
+				//recurse into directories to allow for better separation of triggers/jobs/flows without
+				//imposing a fixed directory structure
+				newff, err := LoadAllFlowForrests(trgt)
+				if err != nil {
+					return nil, err
+				}
+				ff, err = ff.Merge(newff)
+				if err != nil {
+					return nil, err
+				}
+
+				continue
+			}
 		}
 
 		if f.IsDir() {
@@ -153,7 +168,7 @@ func LoadAllFlowForrests(dirPath string) (*FlowForest, error) {
 func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
-		return errors.New(dirPath + " is no directory")
+		return errors.New(dirPath + " is no directory: " + err.Error())
 	}
 
 	s.Triggerables = make(map[string]TriggerableDescription)
@@ -166,9 +181,20 @@ func (s *ObjectStore) LoadAllObjects(dirPath string) error {
 			if err != nil {
 				return errors.New(f.Name() + ":" + err.Error())
 			}
+
 			f, err = os.Stat(trgt)
 			if err != nil {
-				return errors.New(f.Name() + ":" + err.Error())
+				return errors.New(trgt + ":" + err.Error())
+			}
+
+			if f.IsDir() {
+				//recurse into directories to allow for better separation of triggers/jobs/flows without
+				//imposing a fixed directory structure
+				err := s.LoadAllObjects(trgt)
+				if err != nil {
+					return errors.New(f.Name() + ":" + err.Error())
+				}
+				continue
 			}
 		}
 

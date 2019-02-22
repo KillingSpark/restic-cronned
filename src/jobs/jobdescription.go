@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"github.com/killingspark/restic-cronned/src/objectstore"
+	"os"
 )
 
 type JobDescription struct {
@@ -25,7 +26,7 @@ func (jd *JobDescription) ID() string {
 func (jd *JobDescription) Instantiate(unique string) (objectstore.Triggerable, error) {
 	job := &Job{}
 	job.JobName = unique + "__" + jd.JobName
-	job.ResticPath = jd.ResticPath
+	job.ResticPath = os.ExpandEnv(jd.ResticPath)
 	job.ResticArguments = jd.ResticArguments
 	job.Username = jd.Username
 	job.Service = jd.Service

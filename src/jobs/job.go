@@ -85,7 +85,7 @@ const (
 func (job *Job) RetrieveAndStorePassword() {
 	key, err := keyring.Get(job.Service, job.Username)
 	if err != nil {
-		log.WithFields(log.Fields{"Job": job.JobName}).Warning("couldn't retrieve password.")
+		log.WithFields(log.Fields{"Job": job.JobName, "User": job.Username, "Service": job.Service}).Warning("couldn't retrieve password.")
 	} else {
 		log.WithFields(log.Fields{"Job": job.JobName}).Info("retrieved password.")
 		job.password = key

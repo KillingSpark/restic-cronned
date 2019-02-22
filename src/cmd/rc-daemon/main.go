@@ -95,19 +95,24 @@ func startDaemon() {
 
 	err := objs.LoadAllObjects(*dirpath)
 	if err != nil {
-		println(err.Error())
+		println("Loading error: " + err.Error())
 		return
 	}
 
 	ff, err := objectstore.LoadAllFlowForrests(*dirpath)
 	if err != nil {
-		println(err.Error())
+		println("Loading error: " + err.Error())
 		return
 	}
 
 	builtff, err := ff.BuildAll(objs)
 	if err != nil {
-		println(err.Error())
+		println("Building error: " + err.Error())
+		return
+	}
+
+	if len(builtff.Roots) <= 0 {
+		println("No flows found")
 		return
 	}
 

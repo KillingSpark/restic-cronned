@@ -9,26 +9,10 @@
                         "Name": "retry",
                         "Targets": [
                             {
-                                "Name": "oneshot",
-                                "Targets": [
-                                    {
-                                        "Name": "backup"
-                                    }
-                                ]
+                                "Name": "backup"                       
                             },
                             {
-                                "Name": "backup"
-                            },
-                            {
-                                "Name": "oneshot",
-                                "Targets": [
-                                    {
-                                        "Name": "backup"
-                                    },
-                                    {
-                                        "Name": "backup"
-                                    }
-                                ]
+                                "Name": "forget"
                             }
                         ] 
                     }

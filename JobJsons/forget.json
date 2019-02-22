@@ -3,9 +3,9 @@
         "Name": "Job"
     },
     "Spec": {
-        "Name": "backup",
+        "Name": "forget",
         "ResticPath": "$HOME/.local/bin/restic",
-        "Resticarguments": ["-r", "./testrepo", "backup", "./main.go"],
+        "Resticarguments": ["-r", "./testrepo", "forget", "--keep-last", "2"],
 
         "Username": "Apache",
         "Service": "restic-repo1",
